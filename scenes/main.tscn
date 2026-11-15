@@ -1,0 +1,403 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/world.gd" id="2_world"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/menu.gd" id="4_menu"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.08, 0.07, 0.06, 0.78)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.62, 0.48, 0.25, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="Style_menu"]
+content_margin_left = 28.0
+content_margin_top = 24.0
+content_margin_right = 28.0
+content_margin_bottom = 24.0
+bg_color = Color(0.1, 0.085, 0.07, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.72, 0.55, 0.28, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 12
+
+[sub_resource type="StyleBoxFlat" id="Style_bar_bg"]
+bg_color = Color(0.05, 0.05, 0.05, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="Style_hp_fill"]
+bg_color = Color(0.78, 0.18, 0.2, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="Style_xp_fill"]
+bg_color = Color(0.3, 0.55, 0.95, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="Style_chat"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0, 0, 0, 0.35)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="World" type="Node2D" parent="."]
+script = ExtResource("2_world")
+
+[node name="MenuCamera" type="Camera2D" parent="World"]
+position = Vector2(1600, 1560)
+zoom = Vector2(0.8, 0.8)
+
+[node name="Entities" type="Node2D" parent="World"]
+y_sort_enabled = true
+
+[node name="Props" type="Node2D" parent="World/Entities"]
+y_sort_enabled = true
+
+[node name="Enemies" type="Node2D" parent="World/Entities"]
+y_sort_enabled = true
+
+[node name="Players" type="Node2D" parent="World/Entities"]
+y_sort_enabled = true
+
+[node name="FX" type="Node2D" parent="World" groups=["fx_layer"]]
+z_index = 50
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="World"]
+spawn_path = NodePath("../Entities/Players")
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="World"]
+spawn_path = NodePath("../Entities/Enemies")
+
+[node name="EnemyTimer" type="Timer" parent="World"]
+wait_time = 2.5
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3_hud")
+
+[node name="StatsPanel" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 312.0
+offset_bottom = 120.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/StatsPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="NameLabel" type="Label" parent="HUD/StatsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.6, 1)
+theme_override_font_sizes/font_size = 18
+text = "İsim"
+
+[node name="LevelLabel" type="Label" parent="HUD/StatsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Seviye 1"
+
+[node name="HpBar" type="ProgressBar" parent="HUD/StatsPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/background = SubResource("Style_bar_bg")
+theme_override_styles/fill = SubResource("Style_hp_fill")
+value = 100.0
+show_percentage = false
+
+[node name="HpText" type="Label" parent="HUD/StatsPanel/VBox/HpBar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 13
+text = "100 / 100"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="XpBar" type="ProgressBar" parent="HUD/StatsPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/background = SubResource("Style_bar_bg")
+theme_override_styles/fill = SubResource("Style_xp_fill")
+show_percentage = false
+
+[node name="XpText" type="Label" parent="HUD/StatsPanel/VBox/XpBar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 11
+text = "XP 0 / 40"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="HUD/StatsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 13
+text = "Altın 0   •   İksir 0/5 (Q)"
+
+[node name="Chat" type="VBoxContainer" parent="HUD"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -190.0
+offset_right = 452.0
+offset_bottom = -12.0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="ChatLog" type="RichTextLabel" parent="HUD/Chat"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/outline_size = 3
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_font_sizes/normal_font_size = 14
+theme_override_styles/normal = SubResource("Style_chat")
+bbcode_enabled = true
+scroll_following = true
+
+[node name="ChatInput" type="LineEdit" parent="HUD/Chat"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Mesaj yaz ve Enter'a bas (Esc: iptal)"
+max_length = 200
+
+[node name="TopRight" type="VBoxContainer" parent="HUD"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -352.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 132.0
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="OnlineLabel" type="Label" parent="HUD/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "Çevrimiçi: 1"
+horizontal_alignment = 2
+
+[node name="HelpLabel" type="Label" parent="HUD/TopRight"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.85, 0.85)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 12
+text = "WASD: hareket   •   Sol tık / Boşluk: saldırı
+Fare: nişan   •   Enter: sohbet   •   M: ses
+Q: iksir iç   •   B: kamptaki tüccardan iksir al
+Kamptan uzaklaştıkça canavarlar güçlenir!"
+horizontal_alignment = 2
+
+[node name="LeaveButton" type="Button" parent="HUD/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+focus_mode = 0
+text = "Oyundan Ayrıl"
+
+[node name="HintLabel" type="Label" parent="HUD"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -110.0
+offset_right = 260.0
+offset_bottom = -78.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 20
+text = "B: iksir satın al (30 altın)"
+horizontal_alignment = 1
+
+[node name="DeadLabel" type="Label" parent="HUD"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.35, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 42
+text = "Yenik düştün...
+Kampta yeniden doğuyorsun"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Menu" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("4_menu")
+
+[node name="Dim" type="ColorRect" parent="Menu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="Center" type="CenterContainer" parent="Menu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Menu/Center"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_menu")
+
+[node name="VBox" type="VBoxContainer" parent="Menu/Center/Panel"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0.25, 0.12, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 40
+text = "Kadim Diyar"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.8, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "Çok oyunculu aksiyon RPG"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+
+[node name="NameCaption" type="Label" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Karakter adı"
+
+[node name="NameEdit" type="LineEdit" parent="Menu/Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+max_length = 16
+
+[node name="AddressCaption" type="Label" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Sunucu adresi ve port (katılmak için)"
+
+[node name="AddressRow" type="HBoxContainer" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+
+[node name="AddressEdit" type="LineEdit" parent="Menu/Center/Panel/VBox/AddressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "127.0.0.1"
+
+[node name="PortEdit" type="LineEdit" parent="Menu/Center/Panel/VBox/AddressRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "7820"
+
+[node name="ButtonRow" type="HBoxContainer" parent="Menu/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HostButton" type="Button" parent="Menu/Center/Panel/VBox/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Sunucu Kur (Host)"
+
+[node name="JoinButton" type="Button" parent="Menu/Center/Panel/VBox/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Katıl (Join)"
+
+[node name="StatusLabel" type="Label" parent="Menu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.5, 1)
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 3
