@@ -1,7 +1,15 @@
 extends CharacterBody2D
 ## Oyuncu karakteri.
 ## - Hareket ve bakış yönü sahibinde (owner) hesaplanır ve PosSync ile yayılır.
-## - Can, XP, seviye sunucuda hesaplanır ve StatsSync ile yayılır.
+## - Can, XP, seviye, altın, kuşanılan eşyanın nadirliği ve görev sunucuda hesaplanır, StatsSync ile yayılır.
+## - Çantanın tamamı yalnızca sunucuda ve sahibinde bulunur (_inv_sync ile gönderilir).
+## - İstekler (iksir, kuşan, sat, görev, yetenek) sahibinden gelir, sunucu doğrular.
+
+signal inventory_changed
+
+const Look := preload("res://scripts/look.gd")
+const Items := preload("res://scripts/items.gd")
+const Quests := preload("res://scripts/quests.gd")
 
 const SPEED := 230.0
 const ATTACK_RANGE := 72.0
@@ -19,7 +27,22 @@ const POTION_MAX := 5
 const POTION_HEAL := 0.4  # azami canın oranı
 const POTION_COOLDOWN := 6.0
 const MERCHANT_POS := Vector2(1775, 1480)
+const ORACLE_POS := Vector2(1425, 1480)
 const MERCHANT_RANGE := 120.0
+
+const SKILL_ORDER := ["spin", "dash", "heal"]
+const SKILLS := {
+	"spin": {"name": "Kasırga", "key": "E", "level": 3, "cooldown": 6.0},
+	"dash": {"name": "Atılma", "key": "Shift", "level": 5, "cooldown": 4.0},
+	"heal": {"name": "Şifa", "key": "R", "level": 8, "cooldown": 20.0},
+}
+const SPIN_RANGE := 95.0
+const SPIN_DAMAGE := 1.6
+const SPIN_TIME := 0.35
+const DASH_SPEED := 950.0
+const DASH_TIME := 0.17
+const HEAL_RANGE := 230.0
+const HEAL_RATIO := 0.3
 
 # --- Sunucunun yönettiği değerler (StatsSync) ---
 var hp := 100: set = _set_hp
@@ -30,6 +53,11 @@ var damage := 12
 var dead := false
 var gold := 0: set = _set_gold
 var potions := 0: set = _set_potions
+var weapon_rarity := -1
+var armor_rarity := -1
+var quest_kind := ""
+var quest_have := 0: set = _set_quest_have
+var quest_need := 0
 
 # --- Sahibin yönettiği değerler (PosSync) ---
 var sync_pos := Vector2.ZERO
@@ -38,31 +66,50 @@ var facing := Vector2.RIGHT
 # Spawn verisinden gelir (tüm peer'larda aynı)
 var peer_id := 1
 var player_name := "Gezgin"
-var color := Color.WHITE
+var look: Dictionary = {}
 
+# --- Yalnızca sunucuda ---
+## İlerlemenin saklandığı anahtar ("" = misafir, kaydedilmez).
+var save_key := ""
+var inv: Array = []
+var weapon: Dictionary = {}
+var armor: Dictionary = {}
+var _next_item_id := 1
+var _server_last_attack := 0.0
+var _server_last_hit := -100.0
+var _server_last_potion := -100.0
+var _server_skill_ready := {}
+var _server_invuln_until := -1.0
+var _regen_acc := 0.0
+
+# --- Yalnızca sahibinde: arayüz için çanta kopyası ve yetenek bekleme süreleri ---
+var client_inv: Array = []
+var client_weapon: Dictionary = {}
+var client_armor: Dictionary = {}
+var skill_ready_at := {}
+
+# --- Görsel durum ---
 var _attack_cd := 0.0
 var _attack_held := false
 var _swing_time := 0.0
 var _swing_dir := Vector2.RIGHT
+var _spin_time := 0.0
+var _dash_left := 0.0
+var _dash_dir := Vector2.ZERO
+var _dash_fx := 0.0
+var _heal_fx := 0.0
 var _flash := 0.0
 var _walk_anim := 0.0
 var _moving := false
 var _prev_pos := Vector2.ZERO
 var _born_ms := 0
-var _server_last_attack := 0.0
-var _server_last_hit := -100.0
-var _regen_acc := 0.0
-var _server_last_potion := -100.0
 var _bot_shopping := false
-
-## Yalnızca sunucuda dolu: ilerlemenin saklandığı anahtar ("" = misafir, kaydedilmez).
-var save_key := ""
+var _bot_wait := 0.0
 
 
 func _ready() -> void:
 	add_to_group("players")
 	_born_ms = Time.get_ticks_msec()
-	color = Color.from_hsv(fmod(float(peer_id % 997) * 0.618034, 1.0), 0.55, 0.95)
 	$NameLabel.text = player_name
 	sync_pos = position
 	_prev_pos = position
@@ -70,25 +117,61 @@ func _ready() -> void:
 		add_to_group("local_player")
 		$Camera2D.enabled = true
 		$Camera2D.make_current()
+		inventory_changed.connect(_on_inventory_changed)
+		if not multiplayer.is_server():
+			_req_inventory.rpc_id(1)
 
 
 func xp_to_next() -> int:
 	return 40 + (level - 1) * 30
 
 
-## Seviyeden türeyen değerleri kurar (spawn anında, tüm peer'larda aynı veriyle).
-func apply_progress(lv: int, xp_value: int, gold_value: int, potion_count: int) -> void:
-	level = lv
-	xp = xp_value
-	gold = gold_value
-	potions = potion_count
-	max_hp = BASE_HP + (lv - 1) * 20
-	damage = BASE_DAMAGE + (lv - 1) * 4
+## Spawn anında tüm peer'larda aynı veriyle çağrılır.
+func apply_progress(data: Dictionary) -> void:
+	look = Look.sanitize(data.get("look", {}))
+	level = data.get("level", 1)
+	xp = data.get("xp", 0)
+	gold = data.get("gold", 0)
+	potions = data.get("potions", 0)
+	weapon = data.get("weapon", {})
+	armor = data.get("armor", {})
+	quest_kind = data.get("quest_kind", "")
+	quest_need = data.get("quest_need", 0)
+	quest_have = data.get("quest_have", 0)
+	_recalc_stats()
 	hp = max_hp
+
+
+## Seviyeden ve kuşanılan eşyadan türeyen değerler.
+func _recalc_stats() -> void:
+	max_hp = BASE_HP + (level - 1) * 20 + int(armor.get("power", 0))
+	damage = BASE_DAMAGE + (level - 1) * 4 + int(weapon.get("power", 0))
+	weapon_rarity = int(weapon.get("rarity", -1)) if not weapon.is_empty() else -1
+	armor_rarity = int(armor.get("rarity", -1)) if not armor.is_empty() else -1
+	if hp > max_hp:
+		hp = max_hp
 
 
 func near_merchant() -> bool:
 	return position.distance_to(MERCHANT_POS) < MERCHANT_RANGE
+
+
+func near_oracle() -> bool:
+	return position.distance_to(ORACLE_POS) < MERCHANT_RANGE
+
+
+func quest_done() -> bool:
+	return quest_kind != "" and quest_have >= quest_need
+
+
+func skill_unlocked(id: String) -> bool:
+	return level >= int(SKILLS[id].level)
+
+
+## 0 = hazır, 1 = yeni kullanıldı (yalnızca sahibinde anlamlı).
+func skill_cooldown_ratio(id: String) -> float:
+	var left: float = skill_ready_at.get(id, 0.0) - Time.get_ticks_msec() * 0.001
+	return clampf(left / float(SKILLS[id].cooldown), 0.0, 1.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -106,6 +189,9 @@ func _physics_process(delta: float) -> void:
 	if _moving:
 		_walk_anim += delta * 14.0
 	_swing_time = maxf(_swing_time - delta, 0.0)
+	_spin_time = maxf(_spin_time - delta, 0.0)
+	_dash_fx = maxf(_dash_fx - delta, 0.0)
+	_heal_fx = maxf(_heal_fx - delta, 0.0)
 	_flash = maxf(_flash - delta, 0.0)
 	queue_redraw()
 
@@ -113,13 +199,17 @@ func _physics_process(delta: float) -> void:
 func _process_local(delta: float) -> void:
 	var dir := Vector2.ZERO
 	if Network.bot_mode:
-		dir = _bot_think()
+		dir = _bot_think(delta)
 	elif not dead and not _typing():
 		dir = Input.get_vector("move_left", "move_right", "move_up", "move_down")
-		var to_mouse := get_global_mouse_position() - (global_position + Vector2(0, -16))
+		var to_mouse := get_global_mouse_position() - (global_position + Vector2(0, -20))
 		if to_mouse.length() > 4.0:
 			facing = to_mouse.normalized()
-	velocity = Vector2.ZERO if dead else dir * SPEED
+	if _dash_left > 0.0 and not dead:
+		_dash_left -= delta
+		velocity = _dash_dir * DASH_SPEED
+	else:
+		velocity = Vector2.ZERO if dead else dir * SPEED
 	move_and_slide()
 	sync_pos = position
 
@@ -131,7 +221,7 @@ func _process_local(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_multiplayer_authority():
+	if not is_multiplayer_authority() or Network.bot_mode or _typing():
 		return
 	if event.is_action_pressed("attack"):
 		_attack_held = true
@@ -141,7 +231,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		try_use_potion()
 	elif event.is_action_pressed("buy_potion"):
 		try_buy_potion()
+	elif event.is_action_pressed("interact"):
+		try_quest()
+	elif event.is_action_pressed("skill_spin"):
+		try_skill("spin")
+	elif event.is_action_pressed("skill_dash"):
+		try_skill("dash")
+	elif event.is_action_pressed("skill_heal"):
+		try_skill("heal")
 
+
+func _typing() -> bool:
+	return get_viewport().gui_get_focus_owner() is LineEdit
+
+
+func _say(text: String, col := Color(1, 0.8, 0.5)) -> void:
+	FX.floating_text(global_position + Vector2(0, -12), text, col, 13)
+
+
+# --- Sahibin istekleri ---
 
 func try_use_potion() -> void:
 	if potions > 0 and not dead and hp < max_hp:
@@ -152,49 +260,120 @@ func try_buy_potion() -> void:
 	if dead:
 		return
 	if not near_merchant():
-		FX.floating_text(global_position, "Tüccar kampta", Color(1, 0.8, 0.5), 13)
+		_say("Tüccar kampta")
 	elif potions >= POTION_MAX:
-		FX.floating_text(global_position, "Çantan dolu", Color(1, 0.8, 0.5), 13)
+		_say("İksir çantan dolu")
 	elif gold < POTION_COST:
-		FX.floating_text(global_position, "Altın yetmiyor", Color(1, 0.5, 0.4), 13)
+		_say("Altın yetmiyor", Color(1, 0.5, 0.4))
 	else:
 		_buy_potion.rpc_id(1)
 
 
-func _typing() -> bool:
-	return get_viewport().gui_get_focus_owner() is LineEdit
+func try_quest() -> void:
+	if dead:
+		return
+	if not near_oracle():
+		_say("Kâhin kampın batısında")
+	elif quest_kind != "" and not quest_done():
+		_say("Görev sürüyor: " + Quests.describe(quest_kind, quest_have, quest_need))
+	else:
+		_req_quest.rpc_id(1)
 
 
-## Basit test botu: en yakın canavara yürür ve saldırır.
-func _bot_think() -> Vector2:
+func try_equip(item_id: int) -> void:
+	_req_equip.rpc_id(1, item_id)
+
+
+func try_sell(item_id: int) -> void:
+	if not near_merchant():
+		_say("Satmak için tüccara git")
+		return
+	_req_sell.rpc_id(1, item_id)
+
+
+func try_abandon_quest() -> void:
+	if quest_kind != "":
+		_req_abandon_quest.rpc_id(1)
+
+
+func try_skill(id: String) -> void:
+	if dead or not SKILLS.has(id):
+		return
+	if not skill_unlocked(id):
+		_say("%s seviye %d'te açılır" % [SKILLS[id].name, SKILLS[id].level])
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	if now < skill_ready_at.get(id, 0.0):
+		return
+	skill_ready_at[id] = now + float(SKILLS[id].cooldown)
+	var dir := facing
+	if id == "dash":
+		var mv := velocity.normalized() if Network.bot_mode else Input.get_vector("move_left", "move_right", "move_up", "move_down")
+		dir = mv.normalized() if mv.length() > 0.1 else facing
+		_dash_dir = dir
+		_dash_left = DASH_TIME
+	_skill.rpc(id, dir)
+
+
+# --- Test botu: görev alır, tüccara uğrar, avlanır, eşya kuşanır, yetenek kullanır ---
+
+func _bot_think(delta: float) -> Vector2:
 	_attack_held = false
+	_bot_wait -= delta
 	if dead:
 		return Vector2.ZERO
 	if hp < max_hp * 0.5:
 		try_use_potion()
-	# Parası yetiyorsa önce tüccara uğrar.
+	if hp < max_hp * 0.45 and skill_unlocked("heal"):
+		try_skill("heal")
 	if potions == 0 and gold >= POTION_COST:
 		_bot_shopping = true
 	elif potions > 0 or gold < POTION_COST:
 		_bot_shopping = false
 	if _bot_shopping:
-		if near_merchant():
-			try_buy_potion()
-			return Vector2.ZERO
-		facing = (MERCHANT_POS + Vector2(0, 40) - position).normalized()
-		return facing
+		return _bot_walk_to(MERCHANT_POS, try_buy_potion)
+	if quest_kind == "" or quest_done():
+		return _bot_walk_to(ORACLE_POS, try_quest)
 	var best = null
 	var best_d := INF
+	var close := 0
 	for e in get_tree().get_nodes_in_group("enemies"):
 		var d: float = position.distance_to(e.position)
+		if d < SPIN_RANGE + e.radius:
+			close += 1
 		if d < best_d:
 			best_d = d
 			best = e
-	if best == null or dead:
+	if best == null:
 		return Vector2.ZERO
 	facing = (best.position - position).normalized()
+	if close >= 1 and skill_unlocked("spin"):
+		try_skill("spin")
+	if best_d > 260.0 and skill_unlocked("dash"):
+		try_skill("dash")
 	_attack_held = best_d < ATTACK_RANGE
 	return facing if best_d > ATTACK_RANGE * 0.6 else Vector2.ZERO
+
+
+func _bot_walk_to(target: Vector2, action: Callable) -> Vector2:
+	if position.distance_to(target) < MERCHANT_RANGE - 30.0:
+		if _bot_wait <= 0.0:
+			_bot_wait = 1.0
+			action.call()
+		return Vector2.ZERO
+	facing = (target + Vector2(0, 45) - position).normalized()
+	return facing
+
+
+func _on_inventory_changed() -> void:
+	if not Network.bot_mode:
+		return
+	# Bot daha güçlü eşyayı hemen kuşanır (her seferinde bir tane; sonuç yeni bir eşitlemeyle gelir).
+	for item in client_inv:
+		var current: Dictionary = client_weapon if item.slot == "weapon" else client_armor
+		if int(item.power) > int(current.get("power", 0)):
+			try_equip(int(item.id))
+			return
 
 
 # --- Saldırı ---
@@ -228,7 +407,47 @@ func _server_resolve_attack(dir: Vector2) -> void:
 		enemy.server_take_damage(dmg, self)
 
 
-# --- İksir (istek sahibinden gelir, sunucu doğrular) ---
+# --- Yetenekler: görüntü herkeste, etki sunucuda ---
+
+@rpc("authority", "call_local", "reliable")
+func _skill(id: String, dir: Vector2) -> void:
+	match id:
+		"spin":
+			_spin_time = SPIN_TIME
+			SFX.play("spin", global_position)
+		"dash":
+			_dash_fx = 0.3
+			_dash_dir = dir
+			SFX.play("dash", global_position)
+		"heal":
+			_heal_fx = 0.7
+			SFX.play("heal", global_position)
+	if multiplayer.is_server():
+		_server_skill(id, dir)
+
+
+func _server_skill(id: String, _dir: Vector2) -> void:
+	if dead or not SKILLS.has(id) or not skill_unlocked(id):
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	if now < _server_skill_ready.get(id, 0.0) - 0.3:
+		return  # bekleme süresi dolmadan gelen istek (gecikme payı 0,3 sn)
+	_server_skill_ready[id] = now + float(SKILLS[id].cooldown)
+	match id:
+		"spin":
+			for enemy in get_tree().get_nodes_in_group("enemies"):
+				if enemy.position.distance_to(sync_pos) < SPIN_RANGE + enemy.radius:
+					enemy.server_take_damage(int(damage * SPIN_DAMAGE) + randi_range(0, 4), self)
+		"dash":
+			_server_invuln_until = now + 0.35
+		"heal":
+			for p in get_tree().get_nodes_in_group("players"):
+				if not p.dead and p.sync_pos.distance_to(sync_pos) < HEAL_RANGE:
+					p.server_heal(int(p.max_hp * HEAL_RATIO))
+	print("[Yetenek] %s: %s" % [player_name, SKILLS[id].name])
+
+
+# --- İksir ---
 
 @rpc("authority", "call_local", "reliable")
 func _use_potion() -> void:
@@ -247,21 +466,244 @@ func _use_potion() -> void:
 func _buy_potion() -> void:
 	if not multiplayer.is_server() or dead:
 		return
-	if gold < POTION_COST or potions >= POTION_MAX or sync_pos.distance_to(MERCHANT_POS) > MERCHANT_RANGE + 40.0:
+	if gold < POTION_COST or potions >= POTION_MAX or not _server_near(MERCHANT_POS):
 		return
 	gold -= POTION_COST
 	potions += 1
 	print("[Tüccar] %s iksir aldı (altın %d, iksir %d)." % [player_name, gold, potions])
 
 
-func server_add_gold(amount: int) -> void:
-	gold += amount
+func _server_near(pos: Vector2) -> bool:
+	return sync_pos.distance_to(pos) < MERCHANT_RANGE + 40.0
+
+
+# --- Çanta ve eşyalar (sunucu) ---
+
+## Kayıttan gelen çantayı kurar; kimlikler yeniden verilir.
+func server_set_inventory(items: Array, w: Dictionary, a: Dictionary) -> void:
+	inv.clear()
+	_next_item_id = 1
+	for it in items:
+		var clean := Items.sanitize(it)
+		if not clean.is_empty() and inv.size() < Items.INV_MAX:
+			clean.id = _take_id()
+			inv.append(clean)
+	weapon = Items.sanitize(w)
+	armor = Items.sanitize(a)
+	if not weapon.is_empty() and weapon.slot != "weapon":
+		weapon = {}
+	if not armor.is_empty() and armor.slot != "armor":
+		armor = {}
+	if not weapon.is_empty():
+		weapon.id = _take_id()
+	if not armor.is_empty():
+		armor.id = _take_id()
+	var full := hp >= max_hp
+	_recalc_stats()
+	if full:
+		hp = max_hp
+
+
+func _take_id() -> int:
+	_next_item_id += 1
+	return _next_item_id - 1
+
+
+func _inv_index(item_id: int) -> int:
+	for i in inv.size():
+		if int(inv[i].id) == item_id:
+			return i
+	return -1
+
+
+func server_give_item(item: Dictionary, reason := "") -> void:
+	item = item.duplicate()
+	item.id = _take_id()
+	if inv.size() >= Items.INV_MAX:
+		var price := Items.sell_price(item)
+		gold += price
+		Network.send_private(peer_id, "Çanta dolu: %s %d altına satıldı." % [Items.display_name(item), price])
+	else:
+		inv.append(item)
+	print("[Ganimet] %s: %s %s%s" % [player_name, Items.RARITY_NAMES[item.rarity], Items.display_name(item),
+		(" (" + reason + ")") if reason != "" else ""])
+	if item.rarity == 2:
+		Network.broadcast_system("%s efsanevi %s buldu!" % [player_name, item.name])
+	_send_loot_fx(item.name, item.rarity)
+	_send_inventory()
+
+
+func server_roll_loot(enemy_type: String) -> void:
+	if not Items.LOOT.has(enemy_type):
+		return
+	var row: Array = Items.LOOT[enemy_type]
+	var chance: float = row[0] * (6.0 if Network.test_mode else 1.0)
+	if randf() >= chance:
+		return
+	var rarity := Items.roll_rarity(enemy_type == "boss")
+	server_give_item(Items.random_item(rarity, randi_range(row[1], row[2])))
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_inventory() -> void:
+	if multiplayer.is_server():
+		_send_inventory()
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_equip(item_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var idx := _inv_index(item_id)
+	if idx < 0:
+		return
+	var item: Dictionary = inv[idx]
+	inv.remove_at(idx)
+	if item.slot == "weapon":
+		if not weapon.is_empty():
+			inv.append(weapon)
+		weapon = item
+	else:
+		if not armor.is_empty():
+			inv.append(armor)
+		armor = item
+	var full := hp >= max_hp
+	_recalc_stats()
+	if full:
+		hp = max_hp
+	print("[Kuşan] %s: %s" % [player_name, Items.display_name(item)])
+	_send_inventory()
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_sell(item_id: int) -> void:
+	if not multiplayer.is_server() or not _server_near(MERCHANT_POS):
+		return
+	var idx := _inv_index(item_id)
+	if idx < 0:
+		return
+	var item: Dictionary = inv[idx]
+	inv.remove_at(idx)
+	var price := Items.sell_price(item)
+	gold += price
+	print("[Tüccar] %s sattı: %s (%d altın)" % [player_name, Items.display_name(item), price])
+	_send_inventory()
+
+
+func _send_inventory() -> void:
+	if not multiplayer.is_server():
+		return
+	if peer_id == multiplayer.get_unique_id():
+		_inv_sync(inv, weapon, armor)
+	elif Network.player_names.has(peer_id):
+		_inv_sync.rpc_id(peer_id, inv, weapon, armor)
+
+
+@rpc("any_peer", "reliable")
+func _inv_sync(items: Array, w: Dictionary, a: Dictionary) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return  # yalnızca sunucu gönderebilir
+	client_inv = items.duplicate(true)
+	client_weapon = w.duplicate()
+	client_armor = a.duplicate()
+	inventory_changed.emit()
+
+
+func _send_loot_fx(item_name: String, rarity: int) -> void:
+	if peer_id == multiplayer.get_unique_id():
+		_loot_fx(item_name, rarity)
+	elif Network.player_names.has(peer_id):
+		_loot_fx.rpc_id(peer_id, item_name, rarity)
+
+
+@rpc("any_peer", "reliable")
+func _loot_fx(item_name: String, rarity: int) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	rarity = clampi(rarity, 0, 2)
+	FX.floating_text(global_position + Vector2(0, -30), item_name + "!", Items.RARITY_COLORS[rarity], 16 + rarity * 2)
+	if rarity >= 1:
+		FX.poof(global_position + Vector2(0, -20), Items.RARITY_COLORS[rarity])
+	SFX.play("loot", null, -2.0 + rarity * 2.0)
+
+
+# --- Görevler (sunucu) ---
+
+func server_on_kill(enemy_type: String) -> void:
+	if quest_kind != enemy_type or quest_have >= quest_need:
+		return
+	quest_have += 1
+	print("[Görev] %s: %s" % [player_name, Quests.describe(quest_kind, quest_have, quest_need)])
+	if quest_have >= quest_need:
+		Network.send_private(peer_id, "Görev tamamlandı! Ödül için Kâhin'e dön (F).")
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_quest() -> void:
+	if not multiplayer.is_server() or dead or not _server_near(ORACLE_POS):
+		return
+	if quest_kind == "":
+		var kind := Quests.pick_kind(level)
+		quest_need = Quests.need_of(kind, Network.test_mode)
+		quest_have = 0
+		quest_kind = kind
+		print("[Görev] %s aldı: %s" % [player_name, Quests.describe(kind, 0, quest_need)])
+		Network.send_private(peer_id, "Kâhin: \"%s.\" Ödül: %d altın, %d XP ve bir eşya." %
+			[Quests.describe(kind, 0, quest_need).split(" (")[0], Quests.TABLE[kind][1], Quests.TABLE[kind][2]])
+		_send_quest_fx(false)
+	elif quest_have >= quest_need:
+		var row: Array = Quests.TABLE[quest_kind]
+		var kind := quest_kind
+		quest_kind = ""
+		quest_have = 0
+		quest_need = 0
+		gold += row[1]
+		server_add_xp(row[2])
+		var rarity := randi_range(row[3], row[4])
+		server_give_item(Items.random_item(rarity, clampi(level, 1, 15)), "görev ödülü")
+		print("[Görev] %s tamamladı: %s" % [player_name, Quests.NAMES[kind]])
+		Network.broadcast_system("%s, Kâhin'in görevini tamamladı." % player_name)
+		_send_quest_fx(true)
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_abandon_quest() -> void:
+	if not multiplayer.is_server() or quest_kind == "":
+		return
+	print("[Görev] %s bıraktı: %s" % [player_name, quest_kind])
+	quest_kind = ""
+	quest_have = 0
+	quest_need = 0
+
+
+func _send_quest_fx(done: bool) -> void:
+	if peer_id == multiplayer.get_unique_id():
+		_quest_fx(done)
+	elif Network.player_names.has(peer_id):
+		_quest_fx.rpc_id(peer_id, done)
+
+
+@rpc("any_peer", "reliable")
+func _quest_fx(done: bool) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	_say("Görev tamamlandı!" if done else "Yeni görev!", Color(1.0, 0.9, 0.45))
+	SFX.play("quest")
 
 
 # --- Sunucu tarafı can / XP ---
 
+func server_add_gold(amount: int) -> void:
+	gold += amount
+
+
+func server_heal(amount: int) -> void:
+	if not dead:
+		hp = mini(hp + amount, max_hp)
+
+
 func server_take_damage(amount: int) -> void:
-	if dead:
+	if dead or Time.get_ticks_msec() * 0.001 < _server_invuln_until:
 		return
 	_server_last_hit = Time.get_ticks_msec() * 0.001
 	hp = maxi(hp - amount, 0)
@@ -277,10 +719,12 @@ func server_add_xp(amount: int) -> void:
 		var need := xp_to_next()
 		level += 1
 		xp -= need
-		max_hp += 20
-		damage += 4
+		_recalc_stats()
 		hp = max_hp
 		Network.broadcast_system("%s seviye %d oldu!" % [player_name, level])
+		for id in SKILL_ORDER:
+			if int(SKILLS[id].level) == level:
+				Network.send_private(peer_id, "Yeni yetenek: %s (%s)" % [SKILLS[id].name, SKILLS[id].key])
 
 
 func _server_regen(delta: float) -> void:
@@ -325,6 +769,8 @@ func _set_hp(value: int) -> void:
 		_flash = 0.15
 		FX.floating_text(global_position, str(hp - value), Color(1.0, 0.35, 0.3))
 		SFX.play("hurt", global_position)
+	elif _fx_ready() and hp > 0 and value - hp >= maxi(8, int(max_hp * 0.1)):
+		FX.floating_text(global_position, "+%d" % (value - hp), Color(0.45, 1.0, 0.55), 15)
 	hp = value
 
 
@@ -360,69 +806,53 @@ func _set_potions(value: int) -> void:
 	potions = value
 
 
+func _set_quest_have(value: int) -> void:
+	if _fx_ready() and value > quest_have and is_multiplayer_authority() and quest_kind != "":
+		FX.floating_text(global_position + Vector2(0, -44), "Görev %d/%d" % [value, quest_need], Color(1.0, 0.9, 0.45), 13)
+	quest_have = value
+
+
 # --- Çizim ---
 
 func _draw() -> void:
-	var bob := sin(_walk_anim) * 2.0 if _moving else 0.0
-	var col := color
-	if _flash > 0.0:
-		col = col.lerp(Color.WHITE, 0.7)
-	if dead:
-		col = Color(0.45, 0.45, 0.45)
 	modulate.a = 0.45 if dead else 1.0
+	var bob := sin(_walk_anim) * 1.6 if _moving else 0.0
+	var torso := Vector2(0, -20.0 + bob)
 
-	# Gölge
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.4))
-	draw_circle(Vector2.ZERO, 16.0, Color(0, 0, 0, 0.3))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# Atılma izi
+	if _dash_fx > 0.0:
+		var outfit: Color = Look.OUTFITS[Look.sanitize(look).outfit]
+		for k in 3:
+			var off := -_dash_dir * (14.0 + k * 16.0) * (_dash_fx / 0.3)
+			draw_circle(torso + off, 10.0 - k * 2.0, Color(outfit.r, outfit.g, outfit.b, 0.3 - k * 0.08))
+	# Şifa halkası
+	if _heal_fx > 0.0:
+		var k := 1.0 - _heal_fx / 0.7
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
+		draw_arc(Vector2.ZERO, HEAL_RANGE * k, 0.0, TAU, 48, Color(0.45, 1.0, 0.55, 0.7 * (1.0 - k)), 6.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		for i in 6:
+			var a := TAU * i / 6.0 + k * 2.0
+			draw_circle(torso + Vector2.from_angle(a) * (16.0 + k * 10.0) + Vector2(0, -k * 20.0), 2.5, Color(0.6, 1.0, 0.65, 1.0 - k))
 
-	# Ayaklar
-	var step := sin(_walk_anim) * 3.0 if _moving else 0.0
-	draw_circle(Vector2(-6, -3 + step), 4.5, col.darkened(0.55))
-	draw_circle(Vector2(6, -3 - step), 4.5, col.darkened(0.55))
+	var sword_angle := facing.angle() + 1.0
+	if _spin_time > 0.0:
+		var p := 1.0 - _spin_time / SPIN_TIME
+		sword_angle = facing.angle() + p * TAU * 1.5
+		draw_arc(torso, SPIN_RANGE * 0.75, sword_angle - 2.4, sword_angle, 24, Color(1, 1, 1, 0.5 * (1.0 - p) + 0.15), 7.0)
+	elif _swing_time > 0.0:
+		var p := 1.0 - _swing_time / SWING_DURATION
+		sword_angle = _swing_dir.angle() - ATTACK_ARC * 0.5 + ATTACK_ARC * p
+		var start := _swing_dir.angle() - ATTACK_ARC * 0.5
+		draw_arc(torso, ATTACK_RANGE * 0.8, start, sword_angle, 20, Color(1, 1, 1, 0.55 * (1.0 - p) + 0.15), 6.0)
 
-	var body := Vector2(0, -18 + bob)
-	var sword_behind := facing.y < -0.2
-	if sword_behind:
-		_draw_sword(body)
-
-	# Gövde
-	draw_circle(body, 14.0, col.darkened(0.3))
-	draw_circle(body + Vector2(0, -2), 12.0, col)
-	draw_arc(body, 14.0, 0.0, TAU, 28, Color(0, 0, 0, 0.55), 1.5)
-
-	# Gözler (arkası dönükse gözükmez)
-	if facing.y > -0.6:
-		var perp := facing.orthogonal()
-		var eye := body + Vector2(facing.x * 6.0, -3.0 + facing.y * 3.0)
-		for s in [-1.0, 1.0]:
-			var e: Vector2 = eye + perp * 4.0 * s
-			draw_circle(e, 2.8, Color.WHITE)
-			draw_circle(e + facing * 1.2, 1.4, Color(0.1, 0.1, 0.15))
-
-	if not sword_behind:
-		_draw_sword(body)
+	Look.draw(self, look, {
+		"facing": facing, "walk": _walk_anim, "moving": _moving,
+		"flash": 0.7 if _flash > 0.0 else 0.0, "dead": dead,
+		"armor": armor_rarity, "weapon": weapon_rarity, "sword_angle": sword_angle,
+	})
 
 	# Can barı
 	var ratio := float(hp) / float(max(max_hp, 1))
-	draw_rect(Rect2(-19, -50, 38, 6), Color(0, 0, 0, 0.6))
-	draw_rect(Rect2(-18, -49, 36.0 * ratio, 4), Color(0.85, 0.2, 0.2).lerp(Color(0.3, 0.9, 0.35), ratio))
-
-
-func _draw_sword(body: Vector2) -> void:
-	var angle: float
-	if _swing_time > 0.0:
-		var p := 1.0 - _swing_time / SWING_DURATION
-		angle = _swing_dir.angle() - ATTACK_ARC * 0.5 + ATTACK_ARC * p
-		# Kesme izi
-		var start := _swing_dir.angle() - ATTACK_ARC * 0.5
-		draw_arc(body, ATTACK_RANGE * 0.8, start, angle, 20, Color(1, 1, 1, 0.55 * (1.0 - p) + 0.15), 6.0)
-	else:
-		angle = facing.angle() + 1.0
-	var d := Vector2.from_angle(angle)
-	var hand := body + d * 12.0
-	var tip := body + d * 44.0
-	draw_line(hand, tip, Color(0.85, 0.88, 0.95), 4.0)
-	draw_line(hand, tip, Color(1, 1, 1, 0.8), 1.5)
-	draw_line(hand - d.orthogonal() * 6.0, hand + d.orthogonal() * 6.0, Color(0.55, 0.4, 0.15), 3.0)
-	draw_circle(hand, 3.0, Color(0.4, 0.28, 0.12))
+	draw_rect(Rect2(-19, -62, 38, 6), Color(0, 0, 0, 0.6))
+	draw_rect(Rect2(-18, -61, 36.0 * ratio, 4), Color(0.85, 0.2, 0.2).lerp(Color(0.3, 0.9, 0.35), ratio))

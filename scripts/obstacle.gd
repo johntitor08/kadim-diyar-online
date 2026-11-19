@@ -1,5 +1,5 @@
 extends StaticBody2D
-## Haritadaki engeller: ağaç, kaya, kamp ateşi, tüccar tezgâhı. Seed ile üretildiği için senkron gerekmez.
+## Haritadaki engeller: ağaç, kaya, kamp ateşi, tüccar tezgâhı, Kâhin. Seed ile üretildiği için senkron gerekmez.
 
 var kind := "tree"
 var size := 24.0
@@ -26,11 +26,13 @@ func _ready() -> void:
 			shape.radius = size * 0.9
 		"merchant":
 			shape.radius = size * 0.8
+		"oracle":
+			shape.radius = size * 0.6
 	var cs := CollisionShape2D.new()
 	cs.shape = shape
 	cs.position = Vector2(0, -size * 0.25 if kind == "rock" else -4.0)
 	add_child(cs)
-	set_process(kind == "campfire")
+	set_process(kind == "campfire" or kind == "oracle")
 
 
 func _process(delta: float) -> void:
@@ -48,6 +50,8 @@ func _draw() -> void:
 			_draw_campfire()
 		"merchant":
 			_draw_merchant()
+		"oracle":
+			_draw_oracle()
 
 
 func _shadow(r: float) -> void:
@@ -144,3 +148,42 @@ func _draw_merchant() -> void:
 	var font := ThemeDB.fallback_font
 	draw_string_outline(font, Vector2(-60, -s * 2.6), "Tüccar", HORIZONTAL_ALIGNMENT_CENTER, 120, 13, 4, Color(0, 0, 0, 0.85))
 	draw_string(font, Vector2(-60, -s * 2.6), "Tüccar", HORIZONTAL_ALIGNMENT_CENTER, 120, 13, Color(1.0, 0.88, 0.55))
+
+
+func _draw_oracle() -> void:
+	var s := size
+	var float_y := sin(_t * 2.2) * 2.0
+	_shadow(s * 0.9)
+	# Asa ve parlayan küre
+	var staff_top := Vector2(s * 0.75, -s * 2.6)
+	draw_line(Vector2(s * 0.7, -2), staff_top, Color(0.42, 0.28, 0.14), 4.0)
+	var orb := staff_top + Vector2(0, -6 + float_y)
+	draw_circle(orb, 14.0 + sin(_t * 3.0) * 2.0, Color(0.55, 0.75, 1.0, 0.15))
+	draw_circle(orb, 6.5, Color(0.55, 0.8, 1.0))
+	draw_circle(orb + Vector2(-2, -2), 2.2, Color(1, 1, 1, 0.85))
+	# Cüppe
+	var robe := Color(0.28, 0.24, 0.5)
+	draw_colored_polygon(PackedVector2Array([Vector2(-s * 0.75, 0), Vector2(-s * 0.45, -s * 1.5),
+		Vector2(s * 0.45, -s * 1.5), Vector2(s * 0.75, 0)]), robe)
+	draw_colored_polygon(PackedVector2Array([Vector2(-s * 0.12, 0), Vector2(-s * 0.08, -s * 1.45),
+		Vector2(s * 0.08, -s * 1.45), Vector2(s * 0.12, 0)]), Color(0.85, 0.7, 0.3))
+	# Kollar
+	draw_circle(Vector2(s * 0.65, -s * 1.0), 3.6, Color(0.93, 0.78, 0.64))
+	# Kafa, sakal, kukuleta
+	var head := Vector2(0, -s * 1.85)
+	draw_circle(head, s * 0.45, Color(0.93, 0.78, 0.64))
+	draw_colored_polygon(PackedVector2Array([head + Vector2(-s * 0.35, s * 0.05), head + Vector2(0, s * 0.95),
+		head + Vector2(s * 0.35, s * 0.05)]), Color(0.92, 0.92, 0.95))
+	draw_circle(head + Vector2(-3.5, -1), 1.5, Color(0.1, 0.1, 0.15))
+	draw_circle(head + Vector2(3.5, -1), 1.5, Color(0.1, 0.1, 0.15))
+	draw_arc(head + Vector2(0, -2), s * 0.55, PI * 0.95, TAU + PI * 0.05, 16, robe.darkened(0.2), 5.0)
+	draw_colored_polygon(PackedVector2Array([head + Vector2(-s * 0.55, -s * 0.1), head + Vector2(0, -s * 1.1),
+		head + Vector2(s * 0.55, -s * 0.1)]), robe.darkened(0.1))
+	var font := ThemeDB.fallback_font
+	var label_y := -s * 3.3
+	draw_string_outline(font, Vector2(-60, label_y), "Kâhin", HORIZONTAL_ALIGNMENT_CENTER, 120, 13, 4, Color(0, 0, 0, 0.85))
+	draw_string(font, Vector2(-60, label_y), "Kâhin", HORIZONTAL_ALIGNMENT_CENTER, 120, 13, Color(0.7, 0.85, 1.0))
+	# Görev işareti
+	var mark_y := label_y - 20.0 + float_y
+	draw_string_outline(font, Vector2(-20, mark_y), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 22, 5, Color(0, 0, 0, 0.85))
+	draw_string(font, Vector2(-20, mark_y), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 22, Color(1.0, 0.85, 0.25))

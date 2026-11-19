@@ -104,6 +104,29 @@ func _build() -> void:
 	# İksir
 	_streams["potion"] = _make(0.32, func(t: float, u: float) -> float:
 		return _sweep(t, 0.32, 300.0, 900.0) * 0.3 * sin(u * PI) * (0.6 + 0.4 * sin(TAU * 18.0 * t)))
+	# Ganimet: parlak yükselen üç nota
+	var loot_notes := [880.0, 1174.7, 1568.0]
+	_streams["loot"] = _make(0.36, func(t: float, _u: float) -> float:
+		var i := mini(int(t / 0.08), 2)
+		var local := t - i * 0.08
+		return (sin(TAU * loot_notes[i] * t) * 0.28 + sin(TAU * loot_notes[i] * 3.0 * t) * 0.05) * exp(-local * (5.0 if i == 2 else 12.0)))
+	# Kasırga: dönen rüzgâr
+	_streams["spin"] = _make(0.34, func(t: float, u: float) -> float:
+		return (_noise() * 0.22 + _sweep(t, 0.34, 260.0, 520.0) * 0.12) * sin(u * PI) * (0.6 + 0.4 * sin(TAU * 14.0 * t)))
+	# Atılma: kısa hızlı hışırtı
+	_streams["dash"] = _make(0.16, func(t: float, u: float) -> float:
+		return (_noise() * 0.2 + _sweep(t, 0.16, 300.0, 900.0) * 0.12) * sin(u * PI))
+	# Şifa: yumuşak çan
+	_streams["heal"] = _make(0.7, func(t: float, _u: float) -> float:
+		var a := sin(TAU * 659.25 * t) * exp(-t * 4.0)
+		var b := sin(TAU * 987.77 * t) * exp(-maxf(t - 0.12, 0.0) * 4.0) * (1.0 if t > 0.12 else 0.0)
+		return (a + b) * 0.2 * (0.8 + 0.2 * sin(TAU * 7.0 * t)))
+	# Görev: kısa zafer ezgisi
+	var quest_notes := [392.0, 523.25, 659.25, 783.99]
+	_streams["quest"] = _make(0.6, func(t: float, _u: float) -> float:
+		var i := mini(int(t / 0.1), 3)
+		var local := t - i * 0.1
+		return (signf(sin(TAU * quest_notes[i] * t)) * 0.08 + sin(TAU * quest_notes[i] * t) * 0.18) * exp(-local * (3.5 if i == 3 else 8.0)))
 	# Boss kükremesi
 	_streams["boss"] = _make(0.9, func(t: float, u: float) -> float:
 		return (sin(TAU * 65.0 * t) * 0.5 + sin(TAU * 98.0 * t) * 0.25 + _noise() * 0.1) \

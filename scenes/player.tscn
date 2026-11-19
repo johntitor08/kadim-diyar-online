@@ -38,6 +38,21 @@ properties/6/replication_mode = 2
 properties/7/path = NodePath(".:potions")
 properties/7/spawn = true
 properties/7/replication_mode = 2
+properties/8/path = NodePath(".:weapon_rarity")
+properties/8/spawn = true
+properties/8/replication_mode = 2
+properties/9/path = NodePath(".:armor_rarity")
+properties/9/spawn = true
+properties/9/replication_mode = 2
+properties/10/path = NodePath(".:quest_kind")
+properties/10/spawn = true
+properties/10/replication_mode = 2
+properties/11/path = NodePath(".:quest_have")
+properties/11/spawn = true
+properties/11/replication_mode = 2
+properties/12/path = NodePath(".:quest_need")
+properties/12/spawn = true
+properties/12/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 2
@@ -51,9 +66,9 @@ shape = SubResource("CircleShape2D_body")
 
 [node name="NameLabel" type="Label" parent="."]
 offset_left = -80.0
-offset_top = -76.0
+offset_top = -90.0
 offset_right = 80.0
-offset_bottom = -53.0
+offset_bottom = -67.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 14

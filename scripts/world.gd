@@ -19,6 +19,9 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const Obstacle := preload("res://scripts/obstacle.gd")
 const SaveStore := preload("res://scripts/save.gd")
 const Player := preload("res://scripts/player.gd")
+const Items := preload("res://scripts/items.gd")
+const Look := preload("res://scripts/look.gd")
+const Quests := preload("res://scripts/quests.gd")
 
 const GRASS := Color(0.27, 0.5, 0.24)
 const GRASS_DARK := Color(0.245, 0.47, 0.22)
@@ -68,6 +71,7 @@ func _build_map() -> void:
 
 	_add_obstacle(SPAWN_POINT, "campfire", 26.0, 0)
 	_add_obstacle(Player.MERCHANT_POS, "merchant", 26.0, 0)
+	_add_obstacle(Player.ORACLE_POS, "oracle", 24.0, 0)
 	for i in 320:
 		var pos := Vector2(rng.randf_range(60, MAP_SIZE.x - 60), rng.randf_range(80, MAP_SIZE.y - 40))
 		var kind := "tree" if rng.randf() < 0.72 else "rock"
@@ -75,8 +79,8 @@ func _build_map() -> void:
 		var v := rng.randi() % 100
 		if pos.distance_to(SPAWN_POINT) < 260.0:
 			continue
-		if pos.distance_to(Player.MERCHANT_POS) < 110.0:
-			continue  # tüccar tezgâhının çevresi açık kalsın
+		if pos.distance_to(Player.MERCHANT_POS) < 110.0 or pos.distance_to(Player.ORACLE_POS) < 110.0:
+			continue  # tüccarın ve Kâhin'in çevresi açık kalsın
 		if absf(pos.x - SPAWN_POINT.x) < 70.0 or absf(pos.y - SPAWN_POINT.y) < 70.0:
 			continue  # yollar açık kalsın
 		var crowded := false
@@ -169,16 +173,37 @@ func _on_player_registered(id: int, player_name: String) -> void:
 		if not key.is_empty() and other.save_key == key:
 			key = ""
 	var rec: Dictionary = _save.get_player(key) if not key.is_empty() else {}
+	var quest: Dictionary = rec.get("quest") if rec.get("quest") is Dictionary else {}
+	var quest_kind := str(quest.get("kind", ""))
+	if not Quests.TABLE.has(quest_kind):
+		quest_kind = ""
+	var quest_need := clampi(_num(quest.get("need"), 0), 1, 99) if quest_kind != "" else 0
 	var p = player_spawner.spawn({
 		"id": id, "name": player_name, "pos": pos,
-		"level": clampi(int(rec.get("level", 1)), 1, 999),
-		"xp": maxi(int(rec.get("xp", 0)), 0),
-		"gold": clampi(int(rec.get("gold", Player.START_GOLD)), 0, 9999999),
-		"potions": clampi(int(rec.get("potions", 0)), 0, Player.POTION_MAX),
+		"look": Network.player_looks.get(id, Look.random_look()),
+		"level": clampi(_num(rec.get("level"), 1), 1, 999),
+		"xp": maxi(_num(rec.get("xp"), 0), 0),
+		"gold": clampi(_num(rec.get("gold"), Player.START_GOLD), 0, 9999999),
+		"potions": clampi(_num(rec.get("potions"), 0), 0, Player.POTION_MAX),
+		"weapon": Items.sanitize(rec.get("weapon")),
+		"armor": Items.sanitize(rec.get("armor")),
+		"quest_kind": quest_kind,
+		"quest_need": quest_need,
+		"quest_have": clampi(_num(quest.get("have"), 0), 0, quest_need),
 	})
 	p.save_key = key
+	var items: Array = rec.get("inv") if rec.get("inv") is Array else []
+	p.server_set_inventory(items, rec.get("weapon", {}), rec.get("armor", {}))
+	if id == multiplayer.get_unique_id():
+		p._send_inventory()  # uzak oyuncular kendi karakterleri oluşunca çantayı ister
 	if not rec.is_empty():
-		print("[Kayıt] %s yüklendi: seviye %d, altın %d, iksir %d" % [player_name, p.level, p.gold, p.potions])
+		print("[Kayıt] %s yüklendi: seviye %d, altın %d, iksir %d, eşya %d, silah %s, zırh %s" % [player_name,
+			p.level, p.gold, p.potions, p.inv.size(), Items.display_name(p.weapon), Items.display_name(p.armor)])
+
+
+## JSON'dan gelen sayılar float olur; sayı değilse varsayılan döner.
+func _num(v, default: int) -> int:
+	return int(v) if (v is int or v is float) else default
 
 
 func _on_player_left(id: int) -> void:
@@ -215,6 +240,8 @@ func _store_player(p) -> void:
 		return
 	_save.put_player(p.save_key, {
 		"name": p.player_name, "level": p.level, "xp": p.xp, "gold": p.gold, "potions": p.potions,
+		"inv": p.inv, "weapon": p.weapon, "armor": p.armor,
+		"quest": {"kind": p.quest_kind, "have": p.quest_have, "need": p.quest_need} if p.quest_kind != "" else {},
 	})
 
 
@@ -287,7 +314,7 @@ func _spawn_player(data: Dictionary) -> Node:
 	p.peer_id = id
 	p.player_name = data["name"]
 	p.position = data["pos"]
-	p.apply_progress(data.get("level", 1), data.get("xp", 0), data.get("gold", 0), data.get("potions", 0))
+	p.apply_progress(data)
 	p.set_multiplayer_authority(id)  # hareket: sahibi
 	p.get_node("StatsSync").set_multiplayer_authority(1)  # statlar: sunucu
 	return p

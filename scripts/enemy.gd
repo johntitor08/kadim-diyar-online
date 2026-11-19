@@ -162,6 +162,8 @@ func _server_die() -> void:
 		if not p.dead and p.sync_pos.distance_to(position) < 600.0:
 			p.server_add_xp(_data.xp)
 			p.server_add_gold(int(_data.gold * randf_range(0.8, 1.2)))
+			p.server_on_kill(enemy_type)
+			p.server_roll_loot(enemy_type)
 			slayers.append(p.player_name)
 	if enemy_type == "boss":
 		Network.broadcast_system("Kadim Dev yenildi! Kahramanlar: %s" % (", ".join(slayers) if not slayers.is_empty() else "kimse"))

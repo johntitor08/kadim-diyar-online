@@ -1,6 +1,7 @@
 #!/bin/bash
 # Kadim Diyar Online sunucusunu bu bilgisayara systemd kullanıcı servisi olarak kurar ya da günceller.
-# Kullanım: ./deploy/kur.sh [port]   (varsayılan 7820/UDP)
+# Tarayıcı oyuncuları için WebSocket portu (port + 1, TCP) Cloudflare tüneliyle wss adresine açılır.
+# Kullanım: ./deploy/kur.sh [port]   (varsayılan 7820/UDP, 7821/TCP)
 set -euo pipefail
 D="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${1:-7820}"
@@ -50,4 +51,8 @@ systemctl --user enable --now "$SERVIS"
 sleep 3
 systemctl --user --no-pager status "$SERVIS" | head -5
 ss -ulnp | grep ":$PORT " || echo "UYARI: $PORT/UDP dinlenmiyor, logu kontrol et: journalctl --user -u $SERVIS"
+ss -tlnp | grep ":$((PORT + 1)) " || echo "UYARI: $((PORT + 1))/TCP (WebSocket) dinlenmiyor"
+
+echo "== Tarayıcı tüneli kuruluyor"
+KADIM_WS_PORT=$((PORT + 1)) "$D/deploy/web-tunel-kur.sh"
 echo "== Bitti. Log: journalctl --user -u $SERVIS -f"
