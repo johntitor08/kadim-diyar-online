@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kadim Diyar Online — Çok oyunculu aksiyon RPG</title>
+    <meta name="description" content="Kadim Diyar Online: arkadaşlarınla mezarlıktan buzula, volkandan okyanustaki adalara uzanan bölgelerde avlan, Ejderha ve Kraken'i birlikte devir. Ücretsiz, tarayıcıda da oynanır.">
+    <meta name="theme-color" content="#0b1020">
+    <meta property="og:title" content="Kadim Diyar Online">
+    <meta property="og:description" content="Çok oyunculu aksiyon RPG. Ücretsiz • Windows • Linux • Tarayıcı">
+    <meta property="og:image" content="https://johntitor08.github.io/kadim-diyar-online/kapak.png">
+    <meta property="og:type" content="video.other">
+    <meta property="og:video" content="https://johntitor08.github.io/kadim-diyar-online/fragman.mp4">
+    <link rel="icon" href="oyna/index.icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/style/site.css">
+    <style>
+        .kd-hero { padding: 48px 0 32px; }
+        .kd-hero h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 800; margin: 4px 0 10px; }
+        .kd-hero .lead { margin-bottom: 20px; }
+        .kd-video { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); background: #000; border: 1px solid var(--line); }
+        .kd-video video { width: 100%; display: block; aspect-ratio: 16 / 9; background: #000; }
+        .kd-features { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+        .kd-features .card-body h3 { display: flex; align-items: center; gap: 10px; }
+        .kd-features .card-body h3 i { color: var(--accent); }
+        .kd-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .kd-shots a { display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+        .kd-shots img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; transition: transform 0.2s; }
+        .kd-shots a:hover img { transform: scale(1.03); }
+        .kd-shots figcaption { padding: 8px 10px; font-size: 0.9rem; color: var(--muted); background: var(--card); }
+        .kd-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 24px; }
+        .kd-keys li { display: flex; gap: 10px; align-items: baseline; color: var(--muted); }
+        .kd-keys kbd { font-family: "Poppins", sans-serif; font-size: 0.85rem; color: var(--text); background: var(--card);
+            border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+        .kd-zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .kd-zone { border-radius: 12px; padding: 14px 16px; border: 1px solid var(--line); }
+        .kd-zone strong { display: block; font-family: "Poppins", sans-serif; }
+        .kd-zone span { font-size: 0.88rem; color: rgba(255, 255, 255, 0.78); }
+        .kd-foot { padding: 28px 0 40px; color: var(--muted); text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <nav class="nav container">
+            <a href="/" class="brand"><img src="/images/monkeyDluffy.jpeg" alt=""> John Titor</a>
+            <a class="btn btn-sm btn-ghost" href="/#games"><i class="fa-solid fa-arrow-left"></i> Tüm oyunlar</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="kd-hero hero">
+            <div class="container">
+                <p class="eyebrow">Ücretsiz • Çok oyunculu • Windows, Linux, Tarayıcı</p>
+                <h1>Kadim Diyar Online</h1>
+                <p class="lead">Karakterini oluştur, arkadaşlarınla aynı dünyaya gir. Çayırdan mezarlığa, buzuldan volkana ve okyanustaki
+                    adalara uzanan bölgelerde avlan; Ejderha, Kraken ve Kadim Dev'i birlikte devir.</p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary" href="oyna/"><i class="fa-solid fa-play"></i> Tarayıcıda Oyna</a>
+                    <a class="btn btn-ghost" href="https://johntitortheprog.itch.io/kadim-diyar-online" target="_blank" rel="noopener"><i class="fa-brands fa-itch-io"></i> Windows / Linux indir</a>
+                    <a class="btn btn-ghost" href="https://github.com/johntitor08/kadim-diyar-online" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> Kaynak kodu</a>
+                </div>
+                <div class="kd-video">
+                    <video controls preload="metadata" playsinline poster="fragman-kapak.jpg">
+                        <source src="fragman.mp4" type="video/mp4">
+                        Tarayıcın videoyu oynatamıyor: <a href="fragman.mp4">fragmanı indir</a>.
+                    </video>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="container">
+                <div class="section-head"><h2><i class="fa-solid fa-map"></i> Bölgeler</h2></div>
+                <div class="kd-zones">
+                    <div class="kd-zone" style="background:linear-gradient(135deg,#2f5a2a,#1e3a1c)"><strong>Kadim Çayır</strong><span>Kamp, tüccar ve Kâhin. Balçık, kurt, ork; boss Kadim Dev.</span></div>
+                    <div class="kd-zone" style="background:linear-gradient(135deg,#3a4048,#22262c)"><strong>Unutulmuş Mezarlık · Sv 5+</strong><span>Zombi, ok atan iskelet okçu, duvarların içinden geçen hayalet.</span></div>
+                    <div class="kd-zone" style="background:linear-gradient(135deg,#1f4f74,#123049)"><strong>Engin Okyanus · Sv 7+</strong><span>Tekneyle açıl, beş adaya çık: dev yengeç, korsan; açık denizde Kraken.</span></div>
+                    <div class="kd-zone" style="background:linear-gradient(135deg,#5d7590,#33465c)"><strong>Ebedi Buzul · Sv 9+</strong><span>Kar kurdu, yeti ve buz golemi.</span></div>
+                    <div class="kd-zone" style="background:linear-gradient(135deg,#6b2414,#2a1310)"><strong>Kızıl Volkan · Sv 13+</strong><span>Lav gölleri can yakar. Ateş iblisi, lav balçığı ve ateş püskürten Ejderha.</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt">
+            <div class="container">
+                <div class="section-head"><h2><i class="fa-solid fa-star"></i> Neler var?</h2></div>
+                <div class="kd-features">
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-user-pen"></i> Karakter oluştur</h3><p>Ten, saç stili, saç rengi ve kıyafet. Kuşandığın zırh ve kılıç karakterinde görünür.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-users"></i> Birlikte oyna</h3><p>Herkes aynı dünyada. Canavarı birlikte deviren herkes XP, altın ve ganimet şansı kazanır.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-shield-halved"></i> Ekipman</h3><p>Sıradan, nadir ve efsanevi kılıç ve zırhlar. Çantanda karşılaştır, kuşan ya da sat.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-scroll"></i> Görevler</h3><p>Kâhin seviyene göre av görevleri verir: altın, XP ve eşya ödülü.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-wind"></i> Yetenekler</h3><p>Kasırga ile çevrendeki her şeye vur, Atılma ile kaç, Şifa ile ekibini iyileştir.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-store"></i> Market</h3><p>Tüccar iksirin yanında seviyene göre silah ve zırh satar; vitrin 10 dakikada bir yenilenir.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-map-location-dot"></i> Mini harita</h3><p>Sağ üstte bulunduğun bölge; N ile tüm dünyayı gösteren harita.</p></div></article>
+                    <article class="card"><div class="card-body"><h3><i class="fa-solid fa-floppy-disk"></i> Kalıcı ilerleme</h3><p>Seviyen, çantan ve görevin sunucuda saklanır; döndüğünde kaldığın yerden devam edersin.</p></div></article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="container">
+                <div class="section-head"><h2><i class="fa-solid fa-images"></i> Ekran görüntüleri</h2></div>
+                <div class="kd-shots">
+                    <figure><a href="ekran/6_volkan.jpg" target="_blank"><img src="ekran/6_volkan.jpg" alt="Kızıl Volkan'da ejderhanın ateş nefesi" loading="lazy"></a><figcaption>Kızıl Volkan: Ejderha</figcaption></figure>
+                    <figure><a href="ekran/5_okyanus.jpg" target="_blank"><img src="ekran/5_okyanus.jpg" alt="Okyanusta tekne ve Kraken" loading="lazy"></a><figcaption>Engin Okyanus: tekne ve Kraken</figcaption></figure>
+                    <figure><a href="ekran/3_mezarlik.jpg" target="_blank"><img src="ekran/3_mezarlik.jpg" alt="Mezarlıkta zombi, iskelet ve hayalet" loading="lazy"></a><figcaption>Unutulmuş Mezarlık</figcaption></figure>
+                    <figure><a href="ekran/4_buzul.jpg" target="_blank"><img src="ekran/4_buzul.jpg" alt="Buzulda yeti ve buz golemi" loading="lazy"></a><figcaption>Ebedi Buzul</figcaption></figure>
+                    <figure><a href="ekran/2_market.jpg" target="_blank"><img src="ekran/2_market.jpg" alt="Tüccar ve çanta pencereleri" loading="lazy"></a><figcaption>Market ve çanta</figcaption></figure>
+                    <figure><a href="ekran/7_dunya.jpg" target="_blank"><img src="ekran/7_dunya.jpg" alt="Dünya haritası" loading="lazy"></a><figcaption>Dünya haritası</figcaption></figure>
+                    <figure><a href="ekran/1_kamp.jpg" target="_blank"><img src="ekran/1_kamp.jpg" alt="Kamp, Kâhin ve tüccar" loading="lazy"></a><figcaption>Kamp: Kâhin ve tüccar</figcaption></figure>
+                    <figure><a href="ekran/0_karakter.jpg" target="_blank"><img src="ekran/0_karakter.jpg" alt="Karakter oluşturma ekranı" loading="lazy"></a><figcaption>Karakter oluşturma</figcaption></figure>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt">
+            <div class="container">
+                <div class="section-head"><h2><i class="fa-solid fa-keyboard"></i> Tuşlar</h2></div>
+                <ul class="kd-keys">
+                    <li><kbd>WASD</kbd> / oklar / sağ tık basılı: hareket</li>
+                    <li><kbd>Sol tık</kbd> / <kbd>Boşluk</kbd>: saldırı</li>
+                    <li><kbd>E</kbd> Kasırga · <kbd>Shift</kbd> Atılma · <kbd>R</kbd> Şifa</li>
+                    <li><kbd>Q</kbd> iksir iç</li>
+                    <li><kbd>I</kbd> çanta · <kbd>B</kbd> tüccar</li>
+                    <li><kbd>F</kbd> Kâhin'den görev</li>
+                    <li><kbd>N</kbd> dünya haritası</li>
+                    <li><kbd>Enter</kbd> sohbet · <kbd>M</kbd> ses</li>
+                </ul>
+                <p class="muted" style="margin-top:18px">Tarayıcıda tuşlar çalışmazsa oyun alanına bir kez tıkla. Portallar çayırdaki yol uçlarında, okyanus iskelesi batıda.</p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary" href="oyna/"><i class="fa-solid fa-play"></i> Tarayıcıda Oyna</a>
+                    <a class="btn btn-ghost" href="https://johntitortheprog.itch.io/kadim-diyar-online" target="_blank" rel="noopener"><i class="fa-brands fa-itch-io"></i> itch.io sayfası</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="kd-foot">
+        <p>Godot 4.6 ile yapıldı; tüm görseller ve sesler kodla üretilir. <a href="/" style="color:var(--accent)">johntitor08.github.io</a></p>
+    </footer>
+</body>
+</html>
