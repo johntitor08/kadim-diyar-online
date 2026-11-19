@@ -11,7 +11,7 @@ signal player_left(id: int)
 signal chat_received(sender: String, text: String, is_system: bool)
 
 ## Protokol sürümü: RPC imzaları ya da senkronlanan alanlar değişince artır.
-const VERSION := 3
+const VERSION := 4
 const DEFAULT_PORT := 7820  # 7777 bu makinede MyCity sunucusunda
 const WS_PORT_OFFSET := 1   # tarayıcılar için WebSocket portu: DEFAULT_PORT + 1
 const MAX_PLAYERS := 16
@@ -29,6 +29,7 @@ var local_name := "Gezgin%d" % randi_range(100, 999)
 var local_look: Dictionary = {}
 var is_dedicated := false
 var bot_mode := false  # test için: oyuncu kendi kendine savaşır
+var bot_zone := ""      # test botu bu bölgeye geçip orada avlanır
 
 ## Bu cihazın kimliği: sunucu ilerlemeyi (seviye, altın, eşya) bu anahtarla saklar.
 var client_key := ""
@@ -36,7 +37,8 @@ var key_from_cli := false  # --key= ile verildiyse diske yazılmaz
 ## Sunucu ayarları (komut satırından değiştirilebilir)
 var save_path := "user://kayit.json"
 var boss_interval := 240.0
-var test_mode := false  # --test-modu: ganimet şansı yüksek, görevler kısa
+var zone_boss_interval := 180.0  # Ejderha / Kraken: bölgede oyuncu varken bu kadar saniyede bir
+var test_mode := false  # --test-modu: ganimet şansı yüksek, görevler kısa, portal seviyesi yok, başlangıç altını 500
 
 
 func _ready() -> void:

@@ -11,14 +11,14 @@ KAYIT_DOSYA="$HOME/.var/app/org.godotengine.Godot/data/godot/app_userdata/Kadim 
 TMP="$(mktemp -d)"
 trap 'pkill -f "^/app/bin/godot-bin.*--port=$PORT"; pkill -f "^/app/bin/godot-bin.*127.0.0.1:$WS_PORT"; rm -rf "$TMP"; rm -f "$KAYIT_DOSYA"' EXIT
 
-timeout 110 $G -- --server --port=$PORT --kayit=user://test_kayit_$PORT.json --test-modu --boss-sure=8 --sure=72 > "$TMP/sunucu.log" 2>&1 &
+timeout 110 $G -- --server --port=$PORT --kayit=user://test_kayit_$PORT.json --test-modu --boss-sure=8 --bolge-boss-sure=10 --sure=72 > "$TMP/sunucu.log" 2>&1 &
 PS=$!
 sleep 3
 timeout 55 $G -- --join=127.0.0.1 --port=$PORT --bot --name=BotBir --key=${RUN}bir --sure=38 > "$TMP/bot1.log" 2>&1 &
 P1=$!
-timeout 55 $G -- --join=127.0.0.1 --port=$PORT --bot --name=BotIki --key=${RUN}iki --sure=38 > "$TMP/bot2.log" 2>&1 &
+timeout 55 $G -- --join=127.0.0.1 --port=$PORT --bot --bot-bolge=graveyard --name=BotIki --key=${RUN}iki --sure=38 > "$TMP/bot2.log" 2>&1 &
 P2=$!
-timeout 55 $G -- --join=ws://127.0.0.1:$WS_PORT --bot --name=BotWeb --key=${RUN}web --sure=38 > "$TMP/bot3.log" 2>&1 &
+timeout 55 $G -- --join=ws://127.0.0.1:$WS_PORT --bot --bot-bolge=volcano --name=BotWeb --key=${RUN}web --sure=38 > "$TMP/bot3.log" 2>&1 &
 P3=$!
 wait $P1 $P2 $P3
 sleep 2
@@ -46,6 +46,11 @@ kontrol "ganimet düştü"                "\[Ganimet\] Bot"       "$TMP/sunucu.l
 kontrol "eşya kuşanıldı"               "\[Kuşan\] Bot"         "$TMP/sunucu.log"
 kontrol "yetenek kullanıldı (Kasırga)" "\[Yetenek\] Bot.*Kasırga" "$TMP/sunucu.log"
 kontrol "boss duyurusu istemciye ulaştı" "Kadim Dev .* uyandı" "$TMP/bot1.log"
+kontrol "portal: Mezarlık'a geçildi"   "\[Bölge\] BotIki → Unutulmuş Mezarlık" "$TMP/sunucu.log"
+kontrol "portal: Volkan'a geçildi (WebSocket botu)" "\[Bölge\] BotWeb → Kızıl Volkan" "$TMP/sunucu.log"
+kontrol "Mezarlık'ta canavar avlandı"  "\[Av\] .*(Unutulmuş Mezarlık)" "$TMP/sunucu.log"
+kontrol "Ejderha Volkan'da uyandı"     "\[Boss\] Ejderha" "$TMP/sunucu.log"
+kontrol "marketten eşya alındı"        "\[Market\] Bot.* aldı" "$TMP/sunucu.log"
 kontrol "ayrılma sunucuda görüldü"     "oyundan ayrıldı"       "$TMP/sunucu.log"
 kontrol "ilerleme ve çanta kayıttan geri yüklendi" "\[Kayıt\] BotBir yüklendi: seviye .* eşya" "$TMP/sunucu.log"
 grep -h "\[Kayıt\] BotBir yüklendi" "$TMP/sunucu.log" | sed 's/^/      /'

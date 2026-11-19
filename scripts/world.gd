@@ -22,6 +22,16 @@ const Player := preload("res://scripts/player.gd")
 const Items := preload("res://scripts/items.gd")
 const Look := preload("res://scripts/look.gd")
 const Quests := preload("res://scripts/quests.gd")
+const Zones := preload("res://scripts/zones.gd")
+const ZoneGround := preload("res://scripts/zone_ground.gd")
+const Portal := preload("res://scripts/portal.gd")
+const LavaPool := preload("res://scripts/lava_pool.gd")
+## Bölge boss'ları: [tür, doğduğu yer, duyuru]
+const ZONE_BOSSES := {
+	"volcano": ["dragon", Vector2(12600, 700), "Ejderha Kızıl Volkan'ın tepesinde uyandı!"],
+	"ocean": ["kraken", Vector2(4500, 7900), "Kraken Kayıp Ada açıklarında yükseldi!"],
+}
+const ZONE_EMPTY_DESPAWN := 40.0
 
 const GRASS := Color(0.27, 0.5, 0.24)
 const GRASS_DARK := Color(0.245, 0.47, 0.22)
@@ -41,9 +51,14 @@ var _save := SaveStore.new()
 var _hosting := false
 var _autosave_wait := 0.0
 var _boss_wait := 0.0
+var _zone_empty := {}
+var _zone_boss_wait := {}
+## Mini harita için: bölge -> [[konum, tür]]
+var obstacles_by_zone := {}
 
 
 func _ready() -> void:
+	add_to_group("world")
 	player_spawner.spawn_function = _spawn_player
 	enemy_spawner.spawn_function = _spawn_enemy
 	_build_map()
@@ -72,6 +87,7 @@ func _build_map() -> void:
 	_add_obstacle(SPAWN_POINT, "campfire", 26.0, 0)
 	_add_obstacle(Player.MERCHANT_POS, "merchant", 26.0, 0)
 	_add_obstacle(Player.ORACLE_POS, "oracle", 24.0, 0)
+	_build_zones.call_deferred()  # zemin düğümleri çayırın üstüne değil altına eklensin diye sonra
 	for i in 320:
 		var pos := Vector2(rng.randf_range(60, MAP_SIZE.x - 60), rng.randf_range(80, MAP_SIZE.y - 40))
 		var kind := "tree" if rng.randf() < 0.72 else "rock"
@@ -109,6 +125,41 @@ func _add_obstacle(pos: Vector2, kind: String, s: float, v: int) -> void:
 	o.position = pos
 	props.add_child(o)
 	_obstacle_spots.append(pos)
+	var zone := Zones.zone_at(pos)
+	if not obstacles_by_zone.has(zone):
+		obstacles_by_zone[zone] = []
+	obstacles_by_zone[zone].append([pos, kind])
+
+
+## Çayır dışındaki bölgeler: zemin, duvarlar, engeller, lav gölleri ve portallar.
+func _build_zones() -> void:
+	for id in Zones.ORDER:
+		if id == "meadow":
+			continue
+		var r: Rect2 = Zones.ZONES[id].rect
+		var ground := ZoneGround.new()
+		ground.zone = id
+		ground.z_index = -2
+		add_child(ground)
+		var t := 64.0
+		_add_wall(Rect2(r.position.x - t, r.position.y - t, r.size.x + t * 2, t))
+		_add_wall(Rect2(r.position.x - t, r.end.y, r.size.x + t * 2, t))
+		_add_wall(Rect2(r.position.x - t, r.position.y, t, r.size.y))
+		_add_wall(Rect2(r.end.x, r.position.y, t, r.size.y))
+		var lay := Zones.layout(id)
+		for o in lay.obstacles:
+			_add_obstacle(o[0], o[1], o[2], o[3])
+		for pool in lay.pools:
+			var lava := LavaPool.new()
+			lava.radius = pool[1]
+			lava.position = pool[0]
+			add_child(lava)
+	for i in Zones.PORTALS.size():
+		var p := Portal.new()
+		p.index = i
+		p.to_zone = Zones.PORTALS[i].to
+		p.position = Zones.PORTALS[i].pos
+		props.add_child(p)
 
 
 func _draw() -> void:
@@ -183,7 +234,7 @@ func _on_player_registered(id: int, player_name: String) -> void:
 		"look": Network.player_looks.get(id, Look.random_look()),
 		"level": clampi(_num(rec.get("level"), 1), 1, 999),
 		"xp": maxi(_num(rec.get("xp"), 0), 0),
-		"gold": clampi(_num(rec.get("gold"), Player.START_GOLD), 0, 9999999),
+		"gold": clampi(_num(rec.get("gold"), 500 if Network.test_mode else Player.START_GOLD), 0, 9999999),
 		"potions": clampi(_num(rec.get("potions"), 0), 0, Player.POTION_MAX),
 		"weapon": Items.sanitize(rec.get("weapon")),
 		"armor": Items.sanitize(rec.get("armor")),
@@ -217,8 +268,34 @@ func _on_player_left(id: int) -> void:
 func _on_enemy_timer() -> void:
 	if not multiplayer.is_server():
 		return
-	if enemies.get_child_count() < MAX_ENEMIES:
+	var counts := {}
+	for e in enemies.get_children():
+		counts[e.zone] = counts.get(e.zone, 0) + 1
+	if counts.get("meadow", 0) < MAX_ENEMIES:
 		_spawn_random_enemy()
+	for id in Zones.ORDER:
+		if id == "meadow":
+			continue
+		if _players_in(id) > 0:
+			if _zone_empty.get(id, 0.0) > 0.0 or not counts.has(id):
+				if not counts.has(id):
+					print("[Bölge] %s canlandı (oyuncu geldi)." % Zones.ZONES[id].name)
+			_zone_empty[id] = 0.0
+			var have: int = counts.get(id, 0)
+			# Bölge yeni canlandıysa birkaç canavarı birden doğur
+			for k in (6 if have == 0 else 1):
+				if have + k < int(Zones.ZONES[id].max):
+					_spawn_zone_enemy(id)
+			if ZONE_BOSSES.has(id):
+				_zone_boss_tick(id)
+		else:
+			_zone_empty[id] = _zone_empty.get(id, 0.0) + enemy_timer.wait_time
+			_zone_boss_wait[id] = 0.0
+			if _zone_empty[id] >= ZONE_EMPTY_DESPAWN and counts.has(id):
+				for e in enemies.get_children():
+					if e.zone == id:
+						e.queue_free()
+				print("[Bölge] %s boşaldı, canavarlar kaldırıldı." % Zones.ZONES[id].name)
 	_autosave_wait += enemy_timer.wait_time
 	if _autosave_wait >= AUTOSAVE_INTERVAL:
 		_autosave_wait = 0.0
@@ -231,6 +308,66 @@ func _on_enemy_timer() -> void:
 		if _boss_wait >= Network.boss_interval:
 			_boss_wait = 0.0
 			_spawn_boss()
+
+
+func _players_in(zone: String) -> int:
+	var n := 0
+	for p in players.get_children():
+		if Zones.zone_at(p.sync_pos) == zone:
+			n += 1
+	return n
+
+
+func _zone_boss_tick(zone: String) -> void:
+	var row: Array = ZONE_BOSSES[zone]
+	for e in enemies.get_children():
+		if e.enemy_type == row[0]:
+			_zone_boss_wait[zone] = 0.0
+			return
+	_zone_boss_wait[zone] = _zone_boss_wait.get(zone, 0.0) + enemy_timer.wait_time
+	if _zone_boss_wait[zone] >= Network.zone_boss_interval:
+		_zone_boss_wait[zone] = 0.0
+		_enemy_counter += 1
+		enemy_spawner.spawn({"name": "E%d" % _enemy_counter, "type": row[0], "pos": row[1]})
+		print("[Boss] %s" % row[2])
+		Network.broadcast_system(row[2])
+
+
+func _spawn_zone_enemy(zone: String) -> void:
+	var z: Dictionary = Zones.ZONES[zone]
+	var r: Rect2 = z.rect
+	var pos := Vector2.ZERO
+	var ok := false
+	for attempt in 40:
+		pos = Vector2(randf_range(r.position.x + 100, r.end.x - 100), randf_range(r.position.y + 100, r.end.y - 100))
+		if pos.distance_to(z.entry) < Zones.SAFE_RADIUS:
+			continue
+		if zone == "ocean":
+			# Kara canavarları adalarda (liman adası hariç) doğar
+			if not Zones.is_land(pos) or Zones.island_at(pos) == Zones.ISLANDS[0][0]:
+				continue
+		elif Zones.in_lava(pos):
+			continue
+		var blocked := false
+		for o in obstacles_by_zone.get(zone, []):
+			if o[0].distance_to(pos) < 50.0:
+				blocked = true
+				break
+		if not blocked:
+			ok = true
+			break
+	if not ok:
+		return
+	var roll := randf()
+	var type: String = z.types[0][0]
+	var acc := 0.0
+	for row in z.types:
+		acc += row[1]
+		if roll < acc:
+			type = row[0]
+			break
+	_enemy_counter += 1
+	enemy_spawner.spawn({"name": "E%d" % _enemy_counter, "type": type, "pos": pos})
 
 
 # --- Kayıt (yalnızca sunucu) ---

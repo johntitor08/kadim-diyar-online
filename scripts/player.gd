@@ -10,6 +10,7 @@ signal inventory_changed
 const Look := preload("res://scripts/look.gd")
 const Items := preload("res://scripts/items.gd")
 const Quests := preload("res://scripts/quests.gd")
+const Zones := preload("res://scripts/zones.gd")
 
 const SPEED := 230.0
 const ATTACK_RANGE := 72.0
@@ -43,6 +44,12 @@ const DASH_SPEED := 950.0
 const DASH_TIME := 0.17
 const HEAL_RANGE := 230.0
 const HEAL_RATIO := 0.3
+const BOAT_SPEED := 1.35   # suda tekne, yürümekten hızlı
+const LAVA_DAMAGE := 0.06  # saniyede azami canın oranı
+## Market: vitrin bu kadar saniyede bir yenilenir; eşya fiyatı = satış fiyatı x MARKET_MARKUP
+const MARKET_PERIOD := 600
+const MARKET_MARKUP := 4
+const MARKET_SIZE := 5
 
 # --- Sunucunun yönettiği değerler (StatsSync) ---
 var hp := 100: set = _set_hp
@@ -87,6 +94,12 @@ var client_inv: Array = []
 var client_weapon: Dictionary = {}
 var client_armor: Dictionary = {}
 var skill_ready_at := {}
+## Market vitrini (sahibinde): {"period", "offers": [eşya + "price"], "bought": [indeks], "left": sn}
+signal market_changed
+var client_market := {}
+var _market_bought := {}  # sunucu: dönem -> [indeks]
+var _portal_cd := 0.0
+var _lava_acc := 0.0
 
 # --- Görsel durum ---
 var _attack_cd := 0.0
@@ -104,6 +117,7 @@ var _moving := false
 var _prev_pos := Vector2.ZERO
 var _born_ms := 0
 var _bot_shopping := false
+var _bot_market_done := false
 var _bot_wait := 0.0
 
 
@@ -150,6 +164,56 @@ func _recalc_stats() -> void:
 	armor_rarity = int(armor.get("rarity", -1)) if not armor.is_empty() else -1
 	if hp > max_hp:
 		hp = max_hp
+
+
+func on_water() -> bool:
+	return not Zones.is_land(position)
+
+
+func zone() -> String:
+	return Zones.zone_at(position)
+
+
+## Sahibinde: portalın üstüne basınca sunucudan geçiş ister.
+func _check_portals(delta: float) -> void:
+	_portal_cd -= delta
+	if _portal_cd > 0.0 or dead:
+		return
+	for i in Zones.PORTALS.size():
+		var portal: Dictionary = Zones.PORTALS[i]
+		if position.distance_to(portal.pos) < 40.0:
+			_portal_cd = 1.5
+			var need := Zones.level_of(portal.to)
+			if level < need and not Network.test_mode and not Network.bot_mode:
+				_say("%s için seviye %d gerekir" % [Zones.ZONES[portal.to].name, need], Color(1, 0.6, 0.4))
+			else:
+				_req_portal.rpc_id(1, i)
+			return
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_portal(index: int) -> void:
+	if not multiplayer.is_server() or dead or index < 0 or index >= Zones.PORTALS.size():
+		return
+	var portal: Dictionary = Zones.PORTALS[index]
+	if sync_pos.distance_to(portal.pos) > 90.0:
+		return
+	if level < Zones.level_of(portal.to) and not Network.test_mode:
+		Network.send_private(peer_id, "%s için seviye %d gerekir." % [Zones.ZONES[portal.to].name, Zones.level_of(portal.to)])
+		return
+	var dest := Zones.arrival(portal)
+	print("[Bölge] %s → %s" % [player_name, Zones.ZONES[portal.to].name])
+	_server_teleport(dest)
+	Network.send_private(peer_id, "%s bölgesine geçtin." % Zones.ZONES[portal.to].name)
+
+
+func _server_teleport(pos: Vector2) -> void:
+	sync_pos = pos
+	position = pos
+	if peer_id == multiplayer.get_unique_id():
+		_teleport(pos)
+	else:
+		_teleport.rpc_id(peer_id, pos)
 
 
 func near_merchant() -> bool:
@@ -212,9 +276,10 @@ func _process_local(delta: float) -> void:
 		_dash_left -= delta
 		velocity = _dash_dir * DASH_SPEED
 	else:
-		velocity = Vector2.ZERO if dead else dir * SPEED
+		velocity = Vector2.ZERO if dead else dir * SPEED * (BOAT_SPEED if on_water() else 1.0)
 	move_and_slide()
 	sync_pos = position
+	_check_portals(delta)
 
 	_attack_cd -= delta
 	_attack_held = _attack_held and (Input.is_action_pressed("attack") or Network.bot_mode)
@@ -232,8 +297,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_attack_held = false
 	elif event.is_action_pressed("use_potion"):
 		try_use_potion()
-	elif event.is_action_pressed("buy_potion"):
-		try_buy_potion()
 	elif event.is_action_pressed("interact"):
 		try_quest()
 	elif event.is_action_pressed("skill_spin"):
@@ -329,14 +392,22 @@ func _bot_think(delta: float) -> Vector2:
 		try_use_potion()
 	if hp < max_hp * 0.45 and skill_unlocked("heal"):
 		try_skill("heal")
-	if potions == 0 and gold >= POTION_COST:
-		_bot_shopping = true
-	elif potions > 0 or gold < POTION_COST:
-		_bot_shopping = false
-	if _bot_shopping:
-		return _bot_walk_to(MERCHANT_POS, try_buy_potion)
-	if quest_kind == "" or quest_done():
-		return _bot_walk_to(ORACLE_POS, try_quest)
+	var here := zone()
+	if Network.bot_zone != "" and here != Network.bot_zone and Zones.ZONES.has(Network.bot_zone):
+		# Önce hedef bölgenin portalına yürü (portal kontrolü geçişi kendisi ister)
+		for portal in Zones.PORTALS:
+			if portal.to == Network.bot_zone:
+				facing = (portal.pos - position).normalized()
+				return facing
+	if here == "meadow":
+		if (potions == 0 and gold >= POTION_COST) or (not _bot_market_done and gold >= 150):
+			_bot_shopping = true
+		elif (potions > 0 or gold < POTION_COST) and _bot_market_done:
+			_bot_shopping = false
+		if _bot_shopping:
+			return _bot_walk_to(MERCHANT_POS, _bot_shop)
+		if Network.bot_zone == "" and (quest_kind == "" or quest_done()):
+			return _bot_walk_to(ORACLE_POS, try_quest)
 	var best = null
 	var best_d := INF
 	var close := 0
@@ -356,6 +427,21 @@ func _bot_think(delta: float) -> Vector2:
 		try_skill("dash")
 	_attack_held = best_d < ATTACK_RANGE
 	return facing if best_d > ATTACK_RANGE * 0.6 else Vector2.ZERO
+
+
+## Bot alışverişi: iksir alır, marketten parasının yettiği ilk eşyayı alır.
+func _bot_shop() -> void:
+	if potions == 0:
+		try_buy_potion()
+	if client_market.is_empty():
+		_req_market.rpc_id(1)
+		return
+	_bot_market_done = true
+	for i in client_market.offers.size():
+		var offer: Dictionary = client_market.offers[i]
+		if not i in client_market.bought and int(offer.price) <= gold - POTION_COST and client_inv.size() < Items.INV_MAX:
+			try_market_buy(i)
+			return
 
 
 func _bot_walk_to(target: Vector2, action: Callable) -> Vector2:
@@ -543,7 +629,7 @@ func server_roll_loot(enemy_type: String) -> void:
 	var chance: float = row[0] * (6.0 if Network.test_mode else 1.0)
 	if randf() >= chance:
 		return
-	var rarity := Items.roll_rarity(enemy_type == "boss")
+	var rarity := Items.roll_rarity(enemy_type in Items.BOSSES)
 	server_give_item(Items.random_item(rarity, randi_range(row[1], row[2])))
 
 
@@ -628,6 +714,94 @@ func _loot_fx(item_name: String, rarity: int) -> void:
 	if rarity >= 1:
 		FX.poof(global_position + Vector2(0, -20), Items.RARITY_COLORS[rarity])
 	SFX.play("loot", null, -2.0 + rarity * 2.0)
+
+
+# --- Market ---
+
+func market_period() -> int:
+	return int(Time.get_unix_time_from_system()) / MARKET_PERIOD
+
+
+## Vitrin her oyuncuya ve döneme göre seed'lidir: aynı dönemde hep aynı eşyalar.
+func server_market_offers(period: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(str(save_key if save_key != "" else str(peer_id)) + ":" + str(period))
+	var offers := []
+	for i in MARKET_SIZE:
+		var rarity := 0 if i < 2 else 1
+		if i == MARKET_SIZE - 1 and rng.randf() < 0.35:
+			rarity = 2
+		var ilvl := clampi(level + rng.randi_range(-1, 1), 1, 30) if rarity < 2 else clampi(level, 1, 30)
+		var item := Items.make("weapon" if rng.randf() < 0.5 else "armor", rarity, ilvl)
+		item.name = Items.NAMES[item.slot][rarity][rng.randi() % 3]
+		item["price"] = Items.sell_price(item) * MARKET_MARKUP
+		offers.append(item)
+	return offers
+
+
+func open_market() -> void:
+	_req_market.rpc_id(1)
+
+
+func try_market_buy(index: int) -> void:
+	if client_market.is_empty():
+		return
+	if not near_merchant():
+		_say("Tüccardan uzaklaştın")
+		return
+	_req_market_buy.rpc_id(1, int(client_market.period), index)
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_market() -> void:
+	if multiplayer.is_server():
+		_send_market()
+
+
+@rpc("authority", "call_local", "reliable")
+func _req_market_buy(period: int, index: int) -> void:
+	if not multiplayer.is_server() or dead or not _server_near(MERCHANT_POS):
+		return
+	if period != market_period() or index < 0 or index >= MARKET_SIZE:
+		_send_market()  # vitrin yenilenmiş; güncelini gönder
+		return
+	var bought: Array = _market_bought.get(period, [])
+	if index in bought:
+		return
+	var offer: Dictionary = server_market_offers(period)[index]
+	if gold < int(offer.price) or inv.size() >= Items.INV_MAX:
+		return
+	gold -= int(offer.price)
+	bought.append(index)
+	_market_bought = {period: bought}
+	var item := offer.duplicate()
+	item.erase("price")
+	item.id = _take_id()
+	inv.append(item)
+	print("[Market] %s aldı: %s (%d altın)" % [player_name, Items.display_name(item), int(offer.price)])
+	_send_inventory()
+	_send_market()
+
+
+func _send_market() -> void:
+	var period := market_period()
+	var data := {
+		"period": period, "offers": server_market_offers(period), "bought": _market_bought.get(period, []),
+		"left": MARKET_PERIOD - int(Time.get_unix_time_from_system()) % MARKET_PERIOD,
+	}
+	if peer_id == multiplayer.get_unique_id():
+		_market_sync(data)
+	elif Network.player_names.has(peer_id):
+		_market_sync.rpc_id(peer_id, data)
+
+
+@rpc("any_peer", "reliable")
+func _market_sync(data: Dictionary) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	client_market = data.duplicate(true)
+	client_market["received"] = Time.get_ticks_msec()
+	market_changed.emit()
 
 
 # --- Görevler (sunucu) ---
@@ -731,6 +905,12 @@ func server_add_xp(amount: int) -> void:
 
 
 func _server_regen(delta: float) -> void:
+	if not dead and Zones.in_lava(sync_pos) and Time.get_ticks_msec() * 0.001 >= _server_invuln_until:
+		_lava_acc += delta
+		if _lava_acc >= 0.5:
+			_lava_acc = 0.0
+			server_take_damage(maxi(1, int(max_hp * LAVA_DAMAGE * 0.5)))
+		return
 	if dead or hp >= max_hp:
 		return
 	if Time.get_ticks_msec() * 0.001 - _server_last_hit < REGEN_DELAY:
@@ -744,13 +924,12 @@ func _server_regen(delta: float) -> void:
 func _server_respawn() -> void:
 	hp = max_hp
 	dead = false
-	var pos := SPAWN_POINT + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 110.0)
-	sync_pos = pos
-	position = pos
-	if peer_id == multiplayer.get_unique_id():
-		_teleport(pos)
-	else:
-		_teleport.rpc_id(peer_id, pos)
+	var zone_id := Zones.zone_at(sync_pos)
+	var entry: Vector2 = Zones.ZONES[zone_id].entry
+	var pos := entry + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 110.0)
+	if zone_id == "ocean":
+		pos = entry + Vector2(randf_range(-30, 30), randf_range(-60, 60))
+	_server_teleport(pos)
 
 
 @rpc("any_peer", "reliable")
@@ -837,6 +1016,16 @@ func _draw() -> void:
 		for i in 6:
 			var a := TAU * i / 6.0 + k * 2.0
 			draw_circle(torso + Vector2.from_angle(a) * (16.0 + k * 10.0) + Vector2(0, -k * 20.0), 2.5, Color(0.6, 1.0, 0.65, 1.0 - k))
+
+	# Suda: tekne
+	if on_water():
+		var hull := Color(0.5, 0.32, 0.17)
+		var rock := sin(Time.get_ticks_msec() * 0.004 + peer_id) * 2.0
+		draw_set_transform(Vector2(0, 2 + rock), 0.0, Vector2(1.0, 1.0))
+		draw_arc(Vector2(0, 10), 34.0, 0.15, PI - 0.15, 14, Color(1, 1, 1, 0.35), 2.5)
+		draw_colored_polygon(PackedVector2Array([Vector2(-30, -6), Vector2(30, -6), Vector2(21, 10), Vector2(-21, 10)]), hull)
+		draw_line(Vector2(-30, -6), Vector2(30, -6), hull.lightened(0.25), 3.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	var sword_angle := facing.angle() + 1.0
 	if _spin_time > 0.0:

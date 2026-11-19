@@ -8,7 +8,9 @@ extends Node
 ##   godot -- --key=abc12345        -> kayıt anahtarını elle ver (diske yazılmaz; test)
 ##   godot -- --kayit=user://x.json -> sunucu kayıt dosyası (varsayılan user://kayit.json)
 ##   godot -- --boss-sure=10        -> boss'un uyanma aralığı, saniye (varsayılan 240)
-##   godot -- --test-modu           -> sunucu: ganimet şansı 6 kat, görevler 2 canavarlık (test.sh)
+##   godot -- --test-modu           -> sunucu: ganimet şansı 6 kat, görevler 2 canavarlık, portal seviyesi yok (test.sh)
+##   godot -- --bolge-boss-sure=20  -> Ejderha/Kraken uyanma aralığı, saniye (varsayılan 180)
+##   godot -- --bot-bolge=volcano   -> test botu önce bu bölgeye geçer, orada avlanır
 ##   godot -- --foto                -> görsel kontrol: user://foto_*.png yazar ve kapanır
 
 
@@ -38,6 +40,10 @@ func _ready() -> void:
 			Network.save_path = a.get_slice("=", 1)
 		elif a == "--test-modu":
 			Network.test_mode = true
+		elif a.begins_with("--bolge-boss-sure="):
+			Network.zone_boss_interval = maxf(a.get_slice("=", 1).to_float(), 5.0)
+		elif a.begins_with("--bot-bolge="):
+			Network.bot_zone = a.get_slice("=", 1)
 		elif a.begins_with("--boss-sure="):
 			Network.boss_interval = maxf(a.get_slice("=", 1).to_float(), 5.0)
 		elif a.begins_with("--sure="):
@@ -57,7 +63,7 @@ func _ready() -> void:
 		Network.join(join_address, port, Network.local_name)
 
 
-## Görsel kontrol: karakter oluşturma, kamp + arayüz, çanta, boss savaşı, kapak.
+## Görsel kontrol: karakter oluşturma, kamp + arayüz, market, bölgeler, dünya haritası, kapak.
 func _foto() -> void:
 	$Menu.name_edit.text = "Gezgin"  # gerçek oyuncu adı herkese açık görüntülere girmesin
 	await get_tree().create_timer(0.8).timeout
@@ -65,35 +71,56 @@ func _foto() -> void:
 	Network.host(Network.DEFAULT_PORT + 9, "Gezgin")
 	await get_tree().create_timer(1.0).timeout
 	var me = get_tree().get_first_node_in_group("local_player")
+	var world = $World
 	me.position = Vector2(1600, 1560)
 	me.facing = Vector2(0.3, 1.0).normalized()
-	me.level = 9
+	me.level = 14
 	me.server_set_inventory([
-		Items.make("weapon", 1, 7), Items.make("armor", 0, 5), Items.make("armor", 2, 12), Items.make("weapon", 0, 3),
-	], Items.make("weapon", 2, 12), Items.make("armor", 1, 8))
+		Items.make("weapon", 1, 12), Items.make("armor", 0, 10), Items.make("armor", 2, 14), Items.make("weapon", 0, 9),
+	], Items.make("weapon", 2, 15), Items.make("armor", 1, 13))
 	me.hp = me.max_hp
-	me.gold = 420
+	me.gold = 2400
 	me.potions = 3
-	me.quest_kind = "wolf"
-	me.quest_need = 6
-	me.quest_have = 4
+	me.quest_kind = "imp"
+	me.quest_need = 5
+	me.quest_have = 2
 	me._send_inventory()
 	await get_tree().create_timer(0.8).timeout
 	await _shot("foto_1_kamp")
-	$HUD.inventory.toggle()
-	await get_tree().create_timer(0.4).timeout
-	await _shot("foto_2_canta")
-	$HUD.inventory.toggle()
-	me.position = Vector2(1600, 1900)
-	$World.enemy_spawner.spawn({"name": "FotoBoss", "type": "boss", "pos": me.position + Vector2(170, 20)})
-	for k in 3:
-		$World.enemy_spawner.spawn({"name": "FotoKurt%d" % k, "type": "wolf", "pos": me.position + Vector2(-90 + k * 60, 110)})
-	Network.bot_mode = true
-	await get_tree().create_timer(2.2).timeout
-	await _shot("foto_3_savas")
-	$HUD.visible = false  # kapak görseli için arayüzsüz kare
-	await get_tree().create_timer(0.5).timeout
-	await _shot("foto_4_kapak")
+	# Market + çanta
+	me.position = me.MERCHANT_POS + Vector2(-30, 70)
+	await get_tree().create_timer(0.3).timeout
+	$HUD.market.open()
+	$HUD.inventory.visible = true
+	await get_tree().create_timer(0.8).timeout
+	await _shot("foto_2_market")
+	$HUD.market.visible = false
+	$HUD.inventory.visible = false
+	# Bölgeler: oyuncuyu ışınla, yanına bölgenin canavarlarını koy
+	var scenes := [
+		["foto_3_mezarlik", Vector2(4980, 1200), [["zombie", Vector2(170, -70)], ["skeleton", Vector2(240, 90)], ["ghost", Vector2(90, 130)]]],
+		["foto_4_buzul", Vector2(8180, 1200), [["snow_wolf", Vector2(160, -60)], ["yeti", Vector2(250, 70)], ["ice_golem", Vector2(-160, 110)]]],
+		["foto_5_okyanus", Vector2(1750, 5920), [["crab", Vector2(-60, -280)], ["pirate", Vector2(90, -300)], ["kraken", Vector2(330, 120)]]],
+		["foto_6_volkan", Vector2(11420, 1190), [["imp", Vector2(-150, -110)], ["lava_slime", Vector2(-200, 120)], ["dragon", Vector2(230, -40)]]],
+	]
+	var n := 0
+	for sc in scenes:
+		me._server_teleport(sc[1])
+		me.hp = me.max_hp
+		for row in sc[2]:
+			n += 1
+			world.enemy_spawner.spawn({"name": "Foto%d" % n, "type": row[0], "pos": sc[1] + row[1]})
+		await get_tree().create_timer(2.6).timeout
+		me.hp = me.max_hp
+		await _shot(sc[0])
+	$HUD.world_map.visible = true
+	await get_tree().create_timer(0.3).timeout
+	await _shot("foto_7_dunya")
+	$HUD.world_map.visible = false
+	$HUD.visible = false  # kapak görseli için arayüzsüz kare (volkan, ejderha)
+	me.hp = me.max_hp
+	await get_tree().create_timer(1.2).timeout
+	await _shot("foto_8_kapak")
 	get_tree().quit()
 
 

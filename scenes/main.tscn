@@ -247,9 +247,9 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 12
 text = "WASD / oklar / sağ tık basılı: hareket   •   Sol tık / Boşluk: saldırı
-E / Shift / R: yetenekler   •   Q: iksir   •   I: çanta
-B: tüccardan iksir   •   F: Kâhin'den görev
-Enter: sohbet   •   M: ses"
+E / Shift / R: yetenekler   •   Q: iksir   •   I: çanta   •   N: dünya haritası
+B: tüccar   •   F: Kâhin'den görev   •   Enter: sohbet   •   M: ses
+Yol uçlarındaki portallar: Mezarlık (doğu), Buzul (kuzey), Volkan (güney), Okyanus (batı)"
 horizontal_alignment = 2
 
 [node name="LeaveButton" type="Button" parent="HUD/TopRight"]

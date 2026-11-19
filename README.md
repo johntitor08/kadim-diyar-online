@@ -10,13 +10,21 @@ Godot 4.6 ile yapılmış, 2D yukarıdan bakışlı çok oyunculu aksiyon RPG.
 - **Fare**: nişan, **Sol tık / Boşluk**: kılıç saldırısı
 - **E / Shift / R**: yetenekler (Kasırga, Atılma, Şifa)
 - **Q**: iksir iç (azami canın %40'ı, 6 sn bekleme), **B**: kamptaki tüccardan iksir al (30 altın, en çok 5)
-- **I**: çanta, **F**: Kâhin'den görev al / teslim et
+- **I**: çanta, **F**: Kâhin'den görev al / teslim et, **N**: dünya haritası
 - **Enter**: sohbet (Esc: iptal), **M**: sesi aç/kapat
 
 Kamptan uzaklaştıkça canavarlar güçlenir: Balçık → Kurt → Ork.
 Bir canavar öldüğünde 600 px yakınındaki herkes XP ve altın kazanır, yani grup halinde oynamak avantajlıdır.
 Her seviyede +20 maks. can ve +4 hasar kazanılır. 5 saniye hasar almazsan canın yavaşça dolar.
 
+- **Bölgeler:** Kadim Çayır'daki yol uçlarında portallar var: doğuda **Unutulmuş Mezarlık** (Sv 5+: zombi,
+  iskelet okçu, hayalet), kuzeyde **Ebedi Buzul** (Sv 9+: kar kurdu, yeti, buz golemi), güneyde **Kızıl Volkan**
+  (Sv 13+: lav balçığı, ateş iblisi, lav gölleri can yakar, boss **Ejderha** ateş püskürür), batıdaki iskeleden
+  **Engin Okyanus** (Sv 7+: suda tekneyle gidilir, beş ada; dev yengeç, korsan, açık denizde boss **Kraken**).
+  Bölgede oyuncu yoksa canavarlar kaldırılır; bölge boss'ları oyuncu varken 3 dakikada bir uyanır.
+- **Harita:** sağ üstte bulunduğun bölgenin mini haritası (engeller, portallar, canavarlar, oyuncular),
+  **N** ile tüm bölgeleri gösteren dünya haritası.
+- **Market (B):** tüccar iksirin yanında seviyene göre silah ve zırh satar; vitrin 10 dakikada bir yenilenir.
 - **Karakter:** menüde ten, saç stili, saç rengi ve kıyafet seçilir; önizleme canlı güncellenir.
   Kuşanılan zırh ve kılıç karakterin üzerinde görünür (nadirliğe göre renk ve parıltı).
 - **Ekipman:** canavarlar kılıç ve zırh düşürür (Sıradan / Nadir / Efsanevi). Kılıç hasarı, zırh azami canı
@@ -59,6 +67,7 @@ godot --path . -- --join=127.0.0.1 --bot         # kendi kendine oynayan test bo
 godot --path . -- --foto                         # görsel kontrol: user://foto_*.png yazar ve kapanır
 ```
 Sunucu için ek bayraklar: `--kayit=user://baska.json` (kayıt dosyası), `--boss-sure=60` (boss aralığı, sn),
+`--bolge-boss-sure=60` (Ejderha/Kraken aralığı, sn),
 `--test-modu` (ganimet şansı 6 kat, görevler 2 canavarlık). İstemci için: `--key=abc12345` (kayıt anahtarını
 elle ver; diske yazılmaz).
 
@@ -81,6 +90,8 @@ elle ver; diske yazılmaz).
 | `scripts/player.gd` | Hareket sahipte (`PosSync`); can/XP/altın/ekipman/görev sunucuda (`StatsSync`); yetenekler ve istekler |
 | `scripts/look.gd` | Karakter görünümü tabloları ve çizimi (oyun ve menü önizlemesi aynı kodu kullanır) |
 | `scripts/items.gd`, `scripts/quests.gd` | Eşya üretimi, değerleri ve görev tabloları |
+| `scripts/zones.gd`, `scripts/zone_ground.gd`, `scripts/portal.gd`, `scripts/lava_pool.gd` | Bölgeler, adalar, zemin çizimi, portallar, lav gölleri |
+| `scripts/minimap.gd`, `scripts/market_ui.gd`, `scripts/projectile.gd` | Mini harita / dünya haritası, market penceresi, mermi görüntüsü |
 | `scripts/enemy.gd` | Sunucu otoriteli yapay zeka; istemciler sadece interpolasyon yapıp çizer |
 | `scripts/hud.gd`, `scripts/inventory_ui.gd`, `scripts/skillbar.gd` | Oyun içi arayüz, çanta, yetenek çubuğu |
 | `scripts/menu.gd`, `scripts/character_creator.gd` | Ana menü ve karakter oluşturma |

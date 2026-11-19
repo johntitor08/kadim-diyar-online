@@ -3,6 +3,7 @@ extends Node
 ## Efektler ağdan senkronlanmaz; her istemci kendisi çizer.
 
 const Poof := preload("res://scripts/poof.gd")
+const Projectile := preload("res://scripts/projectile.gd")
 
 
 func _layer() -> Node:
@@ -37,6 +38,20 @@ func poof(pos: Vector2, color: Color) -> void:
 	var p := Poof.new()
 	p.color = color
 	p.position = pos
+	layer.add_child(p)
+
+
+func projectile(from: Vector2, to: Vector2, duration: float, color: Color, kind: String) -> void:
+	var layer := _layer()
+	if layer == null or Network.is_dedicated:
+		return
+	var p := Projectile.new()
+	p.from = from
+	p.to = to
+	p.duration = maxf(duration, 0.05)
+	p.color = color
+	p.kind = kind
+	p.position = from
 	layer.add_child(p)
 
 

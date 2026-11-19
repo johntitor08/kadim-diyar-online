@@ -49,7 +49,7 @@ func _init() -> void:
 	vb.add_child(_equipped)
 	vb.add_child(HSeparator.new())
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 270)
+	scroll.custom_minimum_size = Vector2(0, 220)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vb.add_child(scroll)
 	_list = VBoxContainer.new()

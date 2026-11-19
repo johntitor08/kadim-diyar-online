@@ -4,6 +4,9 @@ extends CanvasLayer
 const Quests := preload("res://scripts/quests.gd")
 const InventoryUI := preload("res://scripts/inventory_ui.gd")
 const SkillBar := preload("res://scripts/skillbar.gd")
+const MarketUI := preload("res://scripts/market_ui.gd")
+const Minimap := preload("res://scripts/minimap.gd")
+const Zones := preload("res://scripts/zones.gd")
 
 @onready var stats_panel: Control = %StatsPanel
 @onready var name_label: Label = %NameLabel
@@ -21,6 +24,10 @@ const SkillBar := preload("res://scripts/skillbar.gd")
 @onready var hint_label: Label = %HintLabel
 
 var inventory: PanelContainer
+var market: PanelContainer
+var minimap: Control
+var world_map: Control
+var _zone_label: Label
 var skill_bar: Control
 var _quest_box: PanelContainer
 var _quest_label: Label
@@ -47,13 +54,57 @@ func _ready() -> void:
 	inventory.anchor_right = 1.0
 	inventory.offset_left = -404.0
 	inventory.offset_right = -14.0
-	inventory.offset_top = 150.0
+	inventory.offset_top = 290.0
 	add_child(inventory)
+	market = MarketUI.new()
+	market.position = Vector2(12, 214)
+	add_child(market)
+	# Sağ üst: bölge adı + mini harita; yardım metni sağ alta
+	var top_right: VBoxContainer = $TopRight
+	_zone_label = Label.new()
+	_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_zone_label.add_theme_color_override("font_color", Color(1, 0.88, 0.6))
+	_zone_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_zone_label.add_theme_constant_override("outline_size", 5)
+	_zone_label.add_theme_font_size_override("font_size", 15)
+	top_right.add_child(_zone_label)
+	top_right.move_child(_zone_label, 0)
+	minimap = Minimap.new()
+	minimap.size_flags_horizontal = Control.SIZE_SHRINK_END
+	top_right.add_child(minimap)
+	top_right.move_child(minimap, 1)
+	var help: Label = $TopRight/HelpLabel
+	help.reparent(self)
+	help.anchor_left = 1.0
+	help.anchor_right = 1.0
+	help.anchor_top = 1.0
+	help.anchor_bottom = 1.0
+	help.offset_left = -760.0
+	help.add_theme_font_size_override("font_size", 11)
+	help.offset_right = -12.0
+	help.offset_top = -92.0
+	help.offset_bottom = -10.0
+	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	help.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	world_map = Minimap.new()
+	world_map.big = true
+	world_map.visible = false
+	world_map.anchor_left = 0.5
+	world_map.anchor_right = 0.5
+	world_map.anchor_top = 0.5
+	world_map.anchor_bottom = 0.5
+	world_map.offset_left = -400.0
+	world_map.offset_right = 400.0
+	world_map.offset_top = -290.0
+	world_map.offset_bottom = 270.0
+	add_child(world_map)
 
 	Network.game_started.connect(_on_game_started)
 	Network.game_ended.connect(func(_r: String) -> void:
 		visible = false
-		inventory.visible = false)
+		inventory.visible = false
+		market.visible = false
+		world_map.visible = false)
 	Network.chat_received.connect(_on_chat)
 	chat_input.text_submitted.connect(_on_chat_submitted)
 	chat_input.gui_input.connect(_on_chat_gui_input)
@@ -70,6 +121,7 @@ func _build_quest_box() -> void:
 	style.set_content_margin_all(8)
 	_quest_box.add_theme_stylebox_override("panel", style)
 	_quest_box.position = Vector2(12, 166)
+	_quest_box.custom_minimum_size = Vector2(300, 0)
 	_quest_box.custom_minimum_size = Vector2(300, 0)
 	add_child(_quest_box)
 	var row := HBoxContainer.new()
@@ -109,6 +161,10 @@ func _process(_delta: float) -> void:
 	skill_bar.visible = p != null
 	skill_bar.player = p
 	inventory.set_player(p)
+	market.set_player(p)
+	minimap.player = p
+	world_map.player = p
+	minimap.visible = p != null
 	dead_label.visible = p != null and p.dead
 	if p == null:
 		inventory.visible = false
@@ -125,6 +181,9 @@ func _process(_delta: float) -> void:
 	xp_text.text = "XP %d / %d" % [p.xp, p.xp_to_next()]
 	_update_quest(p)
 	_update_hint(p)
+	var zone: String = Zones.zone_at(p.position)
+	var island := Zones.island_at(p.position)
+	_zone_label.text = Zones.ZONES[zone].name + (("  •  " + island) if island != "" else "") + ("  (tekne)" if p.on_water() else "")
 
 
 func _update_quest(p) -> void:
@@ -143,12 +202,7 @@ func _update_quest(p) -> void:
 func _update_hint(p) -> void:
 	var text := ""
 	if not p.dead and p.near_merchant():
-		if p.potions >= p.POTION_MAX:
-			text = "Tüccar: iksir çantan dolu   •   I: eşya sat"
-		elif p.gold < p.POTION_COST:
-			text = "Tüccar: iksir %d altın (sende %d var)   •   I: eşya sat" % [p.POTION_COST, p.gold]
-		else:
-			text = "B: iksir al (%d altın)   •   I: eşya sat" % p.POTION_COST
+		text = "B: tüccar (iksir, silah, zırh)   •   I: eşya sat" if not market.visible else ""
 	elif not p.dead and p.near_oracle():
 		if p.quest_kind == "":
 			text = "F: Kâhin'den görev al"
@@ -184,8 +238,25 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("inventory"):
 		inventory.toggle()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_cancel") and inventory.visible:
+	elif event.is_action_pressed("world_map"):
+		world_map.visible = not world_map.visible
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("buy_potion"):
+		var p = get_tree().get_first_node_in_group("local_player")
+		if p != null and not p.dead:
+			if p.near_merchant():
+				if market.visible:
+					market.visible = false
+				else:
+					market.open()
+					inventory.visible = true
+			else:
+				p._say("Tüccar kampta (çayırın ortası)")
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_cancel") and (inventory.visible or market.visible or world_map.visible):
 		inventory.visible = false
+		market.visible = false
+		world_map.visible = false
 		get_viewport().set_input_as_handled()
 
 

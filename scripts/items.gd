@@ -19,7 +19,12 @@ const SELL_MULT := [1.0, 2.5, 6.0]
 ## Canavar türü -> [düşme şansı (katılan her oyuncu için), en düşük, en yüksek eşya seviyesi]
 const LOOT := {
 	"slime": [0.06, 1, 3], "wolf": [0.10, 3, 6], "orc": [0.18, 6, 10], "boss": [1.0, 10, 15],
+	"zombie": [0.14, 5, 8], "skeleton": [0.15, 6, 9], "ghost": [0.15, 6, 9],
+	"snow_wolf": [0.15, 9, 12], "yeti": [0.18, 10, 13], "ice_golem": [0.2, 11, 14],
+	"lava_slime": [0.18, 13, 16], "imp": [0.2, 14, 17], "dragon": [1.0, 17, 22],
+	"crab": [0.15, 8, 11], "pirate": [0.2, 9, 12], "kraken": [1.0, 15, 20],
 }
+const BOSSES := ["boss", "dragon", "kraken"]
 
 
 static func power_of(slot: String, rarity: int, ilvl: int) -> int:
