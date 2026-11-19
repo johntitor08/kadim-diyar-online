@@ -13,8 +13,14 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func _process(_delta: float) -> void:
-	queue_redraw()
+var _redraw_acc := 0.0
+
+
+func _process(delta: float) -> void:
+	_redraw_acc += delta
+	if _redraw_acc >= 0.05 and is_visible_in_tree():
+		_redraw_acc = 0.0
+		queue_redraw()
 
 
 func _draw() -> void:

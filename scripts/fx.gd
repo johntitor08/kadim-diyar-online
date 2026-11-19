@@ -5,6 +5,26 @@ extends Node
 const Poof := preload("res://scripts/poof.gd")
 const Projectile := preload("res://scripts/projectile.gd")
 
+var _screen := Rect2()
+var _screen_frame := -1
+
+
+## Kameranın gördüğü dünya dikdörtgeni (kenarlara pay eklenmiş), kare başına bir kez hesaplanır.
+## Ekran dışındaki düğümler yeniden çizilmesin diye kullanılır.
+func screen_rect() -> Rect2:
+	var f := Engine.get_process_frames()
+	if f != _screen_frame:
+		_screen_frame = f
+		var vp := get_viewport()
+		var inv := vp.get_canvas_transform().affine_inverse()
+		_screen = (inv * vp.get_visible_rect()).grow(160.0)
+	return _screen
+
+
+func on_screen(pos: Vector2) -> bool:
+	return screen_rect().has_point(pos)
+
+
 ## Fragman kaydında ödül yazıları (+altın, +XP, seviye, görev) gösterilmez; yalnızca hasar sayıları kalır.
 var quiet := false
 

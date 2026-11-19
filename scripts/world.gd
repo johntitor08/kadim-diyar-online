@@ -26,6 +26,7 @@ const Zones := preload("res://scripts/zones.gd")
 const ZoneGround := preload("res://scripts/zone_ground.gd")
 const Portal := preload("res://scripts/portal.gd")
 const LavaPool := preload("res://scripts/lava_pool.gd")
+const GroundChunk := preload("res://scripts/ground_chunk.gd")
 ## Bölge boss'ları: [tür, doğduğu yer, duyuru]
 const ZONE_BOSSES := {
 	"volcano": ["dragon", Vector2(12600, 700), "Ejderha Kızıl Volkan'ın tepesinde uyandı!"],
@@ -87,6 +88,7 @@ func _build_map() -> void:
 	_add_obstacle(SPAWN_POINT, "campfire", 26.0, 0)
 	_add_obstacle(Player.MERCHANT_POS, "merchant", 26.0, 0)
 	_add_obstacle(Player.ORACLE_POS, "oracle", 24.0, 0)
+	GroundChunk.fill(self, self, Rect2(Vector2.ZERO, MAP_SIZE))
 	_build_zones.call_deferred()  # zemin düğümleri çayırın üstüne değil altına eklensin diye sonra
 	for i in 320:
 		var pos := Vector2(rng.randf_range(60, MAP_SIZE.x - 60), rng.randf_range(80, MAP_SIZE.y - 40))
@@ -162,24 +164,30 @@ func _build_zones() -> void:
 		props.add_child(p)
 
 
-func _draw() -> void:
-	# Harita dışı karanlık orman
-	draw_rect(Rect2(-600, -600, MAP_SIZE.x + 1200, MAP_SIZE.y + 1200), Color(0.08, 0.16, 0.09))
-	var cols := int(MAP_SIZE.x / TILE)
-	var rows := int(MAP_SIZE.y / TILE)
-	for x in cols:
-		for y in rows:
+## Çayır zemininin bir parçası (ground_chunk.gd çağırır).
+func draw_ground_chunk(ci: CanvasItem, area: Rect2) -> void:
+	for x in range(int(area.position.x / TILE), int(area.end.x / TILE)):
+		for y in range(int(area.position.y / TILE), int(area.end.y / TILE)):
 			var h := _hash(x, y)
 			var r := Rect2(x * TILE, y * TILE, TILE, TILE)
-			draw_rect(r, GRASS.lerp(GRASS_DARK, h))
+			ci.draw_rect(r, GRASS.lerp(GRASS_DARK, h))
 			if h > 0.82:
 				var p := r.position + Vector2(_hash(y, x) * 48 + 8, h * 40 + 12)
 				for k in 3:
-					draw_line(p + Vector2(k * 4 - 4, 0), p + Vector2(k * 5 - 6, -7), GRASS.lightened(0.25), 1.5)
+					ci.draw_line(p + Vector2(k * 4 - 4, 0), p + Vector2(k * 5 - 6, -7), GRASS.lightened(0.25), 1.5)
 			elif h < 0.04:
 				var p := r.get_center()
-				draw_circle(p, 3.0, Color(0.95, 0.85, 0.3))
-				draw_circle(p + Vector2(10, 6), 3.0, Color(0.9, 0.5, 0.7))
+				ci.draw_circle(p, 3.0, Color(0.95, 0.85, 0.3))
+				ci.draw_circle(p + Vector2(10, 6), 3.0, Color(0.9, 0.5, 0.7))
+
+
+func _draw() -> void:
+	# Harita dışı karanlık orman (karoların altına girmesin diye dört şerit)
+	var forest := Color(0.08, 0.16, 0.09)
+	draw_rect(Rect2(-600, -600, MAP_SIZE.x + 1200, 600), forest)
+	draw_rect(Rect2(-600, MAP_SIZE.y, MAP_SIZE.x + 1200, 600), forest)
+	draw_rect(Rect2(-600, 0, 600, MAP_SIZE.y), forest)
+	draw_rect(Rect2(MAP_SIZE.x, 0, 600, MAP_SIZE.y), forest)
 	# Yollar
 	draw_line(Vector2(0, SPAWN_POINT.y), Vector2(MAP_SIZE.x, SPAWN_POINT.y), DIRT, 70.0)
 	draw_line(Vector2(SPAWN_POINT.x, 0), Vector2(SPAWN_POINT.x, MAP_SIZE.y), DIRT, 70.0)

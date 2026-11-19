@@ -7,6 +7,7 @@ const Zones := preload("res://scripts/zones.gd")
 var index := 0
 var to_zone := "graveyard"
 var _t := 0.0
+var _redraw_acc := 0.0
 
 
 func _ready() -> void:
@@ -15,7 +16,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	queue_redraw()
+	_redraw_acc += delta
+	if _redraw_acc >= 0.033 and FX.on_screen(global_position):
+		_redraw_acc = 0.0
+		queue_redraw()
 
 
 func is_dock() -> bool:

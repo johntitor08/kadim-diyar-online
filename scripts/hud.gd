@@ -154,7 +154,9 @@ func _on_game_started() -> void:
 func _process(_delta: float) -> void:
 	if not visible:
 		return
-	online_label.text = "Çevrimiçi: %d" % get_tree().get_nodes_in_group("players").size()
+	var online_text := "Çevrimiçi: %d   •   %d FPS" % [get_tree().get_nodes_in_group("players").size(), Engine.get_frames_per_second()]
+	if online_label.text != online_text:
+		online_label.text = online_text
 	var p = get_tree().get_first_node_in_group("local_player")
 	stats_panel.visible = p != null
 	_quest_box.visible = p != null
@@ -183,20 +185,27 @@ func _process(_delta: float) -> void:
 	_update_hint(p)
 	var zone: String = Zones.zone_at(p.position)
 	var island := Zones.island_at(p.position)
-	_zone_label.text = Zones.ZONES[zone].name + (("  •  " + island) if island != "" else "") + ("  (tekne)" if p.on_water() else "")
+	var zone_text: String = Zones.ZONES[zone].name + (("  •  " + island) if island != "" else "") + ("  (tekne)" if p.on_water() else "")
+	if _zone_label.text != zone_text:
+		_zone_label.text = zone_text
 
 
 func _update_quest(p) -> void:
 	_quest_drop.visible = p.quest_kind != ""
+	var text: String
+	var col: Color
 	if p.quest_kind == "":
-		_quest_label.text = "Görev yok: kampın batısındaki Kâhin'e git (F)."
-		_quest_label.add_theme_color_override("font_color", Color(0.75, 0.78, 0.85))
+		text = "Görev yok: kampın batısındaki Kâhin'e git (F)."
+		col = Color(0.75, 0.78, 0.85)
 	elif p.quest_done():
-		_quest_label.text = "Görev tamamlandı! Ödül için Kâhin'e dön (F)."
-		_quest_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.4))
+		text = "Görev tamamlandı! Ödül için Kâhin'e dön (F)."
+		col = Color(1.0, 0.88, 0.4)
 	else:
-		_quest_label.text = "Görev: " + Quests.describe(p.quest_kind, p.quest_have, p.quest_need)
-		_quest_label.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
+		text = "Görev: " + Quests.describe(p.quest_kind, p.quest_have, p.quest_need)
+		col = Color(0.85, 0.92, 1.0)
+	if text != _quest_label.text:
+		_quest_label.text = text
+		_quest_label.add_theme_color_override("font_color", col)
 
 
 func _update_hint(p) -> void:

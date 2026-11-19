@@ -3,8 +3,13 @@ extends Node2D
 ## Her bölge ayrı düğüm olduğu için ekran dışındaki bölgeler çizilmez.
 
 const Zones := preload("res://scripts/zones.gd")
+const GroundChunk := preload("res://scripts/ground_chunk.gd")
 
 var zone := "graveyard"
+
+
+func _ready() -> void:
+	GroundChunk.fill(self, self, Zones.ZONES[zone].rect)
 
 
 func _hash(x: int, y: int) -> float:
@@ -17,16 +22,12 @@ func _draw() -> void:
 	var lay := Zones.layout(zone)
 	var tile := 128.0 if zone == "ocean" else 64.0
 	var base: Color = z.color
-	# Bölge dışı kenar boşluğu
-	draw_rect(r.grow(500.0), base.darkened(0.55))
-	var cols := int(r.size.x / tile)
-	var rows := int(r.size.y / tile)
-	for x in cols:
-		for y in rows:
-			var h := _hash(x + int(r.position.x / 64.0), y + 31)
-			var t := Rect2(r.position + Vector2(x, y) * tile, Vector2(tile, tile))
-			draw_rect(t, base.lerp(base.darkened(0.12), h))
-			_tile_detail(t, h)
+	# Bölge dışı kenar boşluğu (karoların altına girmesin diye dört şerit)
+	var edge := base.darkened(0.55)
+	draw_rect(Rect2(r.position.x - 500, r.position.y - 500, r.size.x + 1000, 500), edge)
+	draw_rect(Rect2(r.position.x - 500, r.end.y, r.size.x + 1000, 500), edge)
+	draw_rect(Rect2(r.position.x - 500, r.position.y, 500, r.size.y), edge)
+	draw_rect(Rect2(r.end.x, r.position.y, 500, r.size.y), edge)
 	match zone:
 		"graveyard":
 			_draw_path(r, z.entry, Color(0.36, 0.33, 0.3))
@@ -54,32 +55,50 @@ func _draw() -> void:
 	draw_rect(r, base.darkened(0.6), false, 8.0)
 
 
-func _tile_detail(t: Rect2, h: float) -> void:
+## Zeminin bir parçası (ground_chunk.gd çağırır): karolar ve karo süsleri.
+func draw_ground_chunk(ci: CanvasItem, area: Rect2) -> void:
+	var z: Dictionary = Zones.ZONES[zone]
+	var r: Rect2 = z.rect
+	var tile := 128.0 if zone == "ocean" else 64.0
+	var base: Color = z.color
+	var x0 := int((area.position.x - r.position.x) / tile)
+	var y0 := int((area.position.y - r.position.y) / tile)
+	var x1 := int(ceil((area.end.x - r.position.x) / tile))
+	var y1 := int(ceil((area.end.y - r.position.y) / tile))
+	for x in range(x0, x1):
+		for y in range(y0, y1):
+			var h := _hash(x + int(r.position.x / 64.0), y + 31)
+			var t := Rect2(r.position + Vector2(x, y) * tile, Vector2(tile, tile))
+			ci.draw_rect(t, base.lerp(base.darkened(0.12), h))
+			_tile_detail(ci, t, h)
+
+
+func _tile_detail(ci: CanvasItem, t: Rect2, h: float) -> void:
 	match zone:
 		"graveyard":
 			if h > 0.86:
 				var p := t.position + Vector2(h * 40 + 10, 30)
 				for k in 3:
-					draw_line(p + Vector2(k * 4 - 4, 0), p + Vector2(k * 5 - 6, -6), Color(0.3, 0.36, 0.3), 1.5)
+					ci.draw_line(p + Vector2(k * 4 - 4, 0), p + Vector2(k * 5 - 6, -6), Color(0.3, 0.36, 0.3), 1.5)
 			elif h < 0.05:
-				draw_circle(t.get_center(), 3.0, Color(0.85, 0.85, 0.8, 0.6))  # kemik parçası
+				ci.draw_circle(t.get_center(), 3.0, Color(0.85, 0.85, 0.8, 0.6))  # kemik parçası
 		"glacier":
 			if h > 0.8:
-				draw_circle(t.position + Vector2(h * 50, 20), 2.0, Color(1, 1, 1, 0.8))
-				draw_circle(t.position + Vector2(20, h * 50), 1.6, Color(1, 1, 1, 0.7))
+				ci.draw_circle(t.position + Vector2(h * 50, 20), 2.0, Color(1, 1, 1, 0.8))
+				ci.draw_circle(t.position + Vector2(20, h * 50), 1.6, Color(1, 1, 1, 0.7))
 		"volcano":
 			if h > 0.78:
 				var a := t.position + Vector2(8, h * 50)
 				var b := a + Vector2(30, -12 + h * 10)
-				draw_line(a, b, Color(1.0, 0.4, 0.1, 0.55), 2.5)
-				draw_line(b, b + Vector2(16, 10), Color(1.0, 0.55, 0.15, 0.45), 2.0)
+				ci.draw_line(a, b, Color(1.0, 0.4, 0.1, 0.55), 2.5)
+				ci.draw_line(b, b + Vector2(16, 10), Color(1.0, 0.55, 0.15, 0.45), 2.0)
 			elif h < 0.06:
-				draw_circle(t.get_center(), 2.5, Color(1.0, 0.6, 0.2, 0.7))  # kor
+				ci.draw_circle(t.get_center(), 2.5, Color(1.0, 0.6, 0.2, 0.7))  # kor
 		"ocean":
 			if h > 0.55:
 				var p := t.position + Vector2(h * 80, 30 + h * 50)
-				draw_arc(p, 9.0, PI * 1.1, PI * 1.9, 6, Color(0.7, 0.85, 0.95, 0.35), 2.0)
-				draw_arc(p + Vector2(16, 0), 9.0, PI * 1.1, PI * 1.9, 6, Color(0.7, 0.85, 0.95, 0.35), 2.0)
+				ci.draw_arc(p, 9.0, PI * 1.1, PI * 1.9, 6, Color(0.7, 0.85, 0.95, 0.35), 2.0)
+				ci.draw_arc(p + Vector2(16, 0), 9.0, PI * 1.1, PI * 1.9, 6, Color(0.7, 0.85, 0.95, 0.35), 2.0)
 
 
 func _draw_path(r: Rect2, entry: Vector2, col: Color) -> void:

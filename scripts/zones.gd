@@ -204,11 +204,15 @@ static func _blob_land(blobs: Array, pos: Vector2, margin := 0.0) -> bool:
 	return false
 
 
+## Kum şeridi (zone_ground.gd'de kara dairesinin 14 px dışına kadar çizilir) de kara sayılır.
+const SHORE := 12.0
+
+
 ## Okyanusta bu nokta kara mı? (Okyanus dışında her yer kara sayılır.)
 static func is_land(pos: Vector2) -> bool:
 	if not ZONES.ocean.rect.grow(200.0).has_point(pos):
 		return true
-	return _blob_land(layout("ocean").land, pos)
+	return _blob_land(layout("ocean").land, pos, SHORE)
 
 
 ## Bu nokta hangi adada? Değilse "".

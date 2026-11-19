@@ -130,7 +130,8 @@ func _physics_process(delta: float) -> void:
 	_flash = maxf(_flash - delta, 0.0)
 	_lunge_time = maxf(_lunge_time - delta, 0.0)
 	_breath_time = maxf(_breath_time - delta, 0.0)
-	queue_redraw()
+	if not Network.is_dedicated and FX.on_screen(position):
+		queue_redraw()
 
 
 # --- Sunucu yapay zekası ---

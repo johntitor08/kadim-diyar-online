@@ -100,6 +100,7 @@ var client_market := {}
 var _market_bought := {}  # sunucu: dönem -> [indeks]
 var _portal_cd := 0.0
 var _lava_acc := 0.0
+var _was_on_water := false
 
 # --- Görsel durum ---
 var _attack_cd := 0.0
@@ -172,6 +173,19 @@ func on_water() -> bool:
 
 func zone() -> String:
 	return Zones.zone_at(position)
+
+
+## Kıyıdan suya geçince tekneye biner, karaya basınca iner (yalnızca bildirim; hareket otomatik).
+func _check_boat() -> void:
+	var water := on_water()
+	if water == _was_on_water:
+		return
+	_was_on_water = water
+	if Time.get_ticks_msec() - _born_ms < 1500:
+		return  # ışınlanma/doğma anında bildirim gösterme
+	_say("Tekneye bindin" if water else "Karaya çıktın", Color(0.6, 0.85, 1.0))
+	FX.poof(global_position, Color(0.55, 0.8, 1.0))
+	SFX.play("dash", global_position, -4.0)
 
 
 ## Sahibinde: portalın üstüne basınca sunucudan geçiş ister.
@@ -257,7 +271,8 @@ func _physics_process(delta: float) -> void:
 	_dash_fx = maxf(_dash_fx - delta, 0.0)
 	_heal_fx = maxf(_heal_fx - delta, 0.0)
 	_flash = maxf(_flash - delta, 0.0)
-	queue_redraw()
+	if not Network.is_dedicated and FX.on_screen(position):
+		queue_redraw()
 
 
 func _process_local(delta: float) -> void:
@@ -280,6 +295,7 @@ func _process_local(delta: float) -> void:
 	move_and_slide()
 	sync_pos = position
 	_check_portals(delta)
+	_check_boat()
 
 	_attack_cd -= delta
 	_attack_held = _attack_held and (Input.is_action_pressed("attack") or Network.bot_mode)

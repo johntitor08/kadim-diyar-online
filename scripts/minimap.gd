@@ -22,9 +22,14 @@ func _init() -> void:
 	custom_minimum_size = Vector2(SIZE, SIZE)
 
 
+var _redraw_acc := 0.0
+
+
 func _process(delta: float) -> void:
 	_t += delta
-	if visible:
+	_redraw_acc += delta
+	if visible and is_visible_in_tree() and _redraw_acc >= 0.1:
+		_redraw_acc = 0.0
 		queue_redraw()
 
 

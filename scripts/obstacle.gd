@@ -5,6 +5,7 @@ var kind := "tree"
 var size := 24.0
 var variant := 0
 var _t := 0.0
+var _redraw_acc := 0.0
 
 
 func setup(k: String, s: float, v: int) -> void:
@@ -40,12 +41,15 @@ func _ready() -> void:
 	cs.shape = shape
 	cs.position = Vector2(0, -size * 0.25 if kind in ["rock", "snowrock", "basalt"] else -4.0)
 	add_child(cs)
-	set_process(kind in ["campfire", "oracle", "vent", "palm"])
+	set_process(kind in ["campfire", "oracle", "vent"])
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	queue_redraw()
+	_redraw_acc += delta
+	if _redraw_acc >= 0.033 and FX.on_screen(global_position):
+		_redraw_acc = 0.0
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -310,7 +314,7 @@ func _draw_vent() -> void:
 func _draw_palm() -> void:
 	var s := size
 	_shadow(s * 0.9)
-	var sway := sin(_t * 1.3 + variant) * 2.5
+	var sway := sin(variant * 1.7) * 2.5
 	var trunk := Color(0.55, 0.4, 0.24)
 	var top := Vector2(s * 0.3 + sway, -s * 2.4)
 	for k in 6:
