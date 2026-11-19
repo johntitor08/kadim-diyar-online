@@ -77,6 +77,7 @@ elle ver; diske yazılmaz).
 ./sunucu.sh [port]        # ekransız sunucu (varsayılan 7820/UDP + 7821/TCP), Ctrl+C ile kapanır
 ./test.sh                 # sunucu + iki ENet botu + bir WebSocket botu ile ağ testi (~80 sn)
 ./deploy/kur.sh           # kalıcı sunucu: systemd kullanıcı servisi "kadim-diyar-sunucu" + tarayıcı tüneli
+./tools/fragman.sh        # fragman: oyun içinden 30 fps kayıt + kodla üretilen müzik → build/fragman/*.mp4
 ```
 
 ## Mimari

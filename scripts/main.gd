@@ -12,6 +12,7 @@ extends Node
 ##   godot -- --bolge-boss-sure=20  -> Ejderha/Kraken uyanma aralığı, saniye (varsayılan 180)
 ##   godot -- --bot-bolge=volcano   -> test botu önce bu bölgeye geçer, orada avlanır
 ##   godot -- --foto                -> görsel kontrol: user://foto_*.png yazar ve kapanır
+##   godot -- --fragman             -> senaryolu fragman (--write-movie ile kaydedilir, tools/fragman.sh)
 
 
 const Items := preload("res://scripts/items.gd")
@@ -22,6 +23,7 @@ func _ready() -> void:
 	var port := Network.DEFAULT_PORT
 	var join_address := ""
 	var foto := false
+	var fragman := false
 	for a in args:
 		if a.begins_with("--name="):
 			Network.local_name = a.get_slice("=", 1)
@@ -33,6 +35,8 @@ func _ready() -> void:
 			Network.bot_mode = true
 		elif a == "--foto":
 			foto = true
+		elif a == "--fragman":
+			fragman = true
 		elif a.begins_with("--key="):
 			Network.client_key = a.get_slice("=", 1)
 			Network.key_from_cli = true
@@ -49,7 +53,9 @@ func _ready() -> void:
 		elif a.begins_with("--sure="):
 			get_tree().create_timer(a.get_slice("=", 1).to_float()).timeout.connect(get_tree().quit)
 
-	if foto:
+	if fragman:
+		add_child(preload("res://scripts/trailer.gd").new())
+	elif foto:
 		Network.client_key = "fototest0001"
 		Network.key_from_cli = true
 		Network.save_path = "user://foto_kayit.json"

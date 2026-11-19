@@ -5,6 +5,9 @@ extends Node
 const Poof := preload("res://scripts/poof.gd")
 const Projectile := preload("res://scripts/projectile.gd")
 
+## Fragman kaydında ödül yazıları (+altın, +XP, seviye, görev) gösterilmez; yalnızca hasar sayıları kalır.
+var quiet := false
+
 
 func _layer() -> Node:
 	return get_tree().get_first_node_in_group("fx_layer")
@@ -13,6 +16,8 @@ func _layer() -> Node:
 func floating_text(pos: Vector2, text: String, color: Color, font_size := 16) -> void:
 	var layer := _layer()
 	if layer == null or Network.is_dedicated:
+		return
+	if quiet and not text.is_valid_int():
 		return
 	var label := Label.new()
 	label.text = text

@@ -311,7 +311,8 @@ func _draw() -> void:
 	var r := radius
 	var col: Color = _data.color
 	if _flash > 0.0:
-		col = col.lerp(Color.WHITE, 0.75)
+		# Büyük boss'lar hep vurulur; tam beyaz parlama onları soluk gösterir
+		col = col.lerp(Color.WHITE, 0.3 if (enemy_type == "boss" or _data.get("boss", false)) else 0.75)
 	var off := _lunge_dir * sin(_lunge_time / 0.2 * PI) * 10.0
 
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.4))

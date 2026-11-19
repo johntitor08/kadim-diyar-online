@@ -938,6 +938,15 @@ func _teleport(pos: Vector2) -> void:
 		return  # sadece sunucu ışınlayabilir
 	position = pos
 	sync_pos = pos
+	snap_camera()
+
+
+## Işınlanınca kamera yumuşak takiple aradaki bölgelerin üstünden kaymasın.
+func snap_camera() -> void:
+	if is_multiplayer_authority():
+		var cam: Camera2D = $Camera2D
+		cam.force_update_scroll.call_deferred()
+		cam.reset_smoothing.call_deferred()
 
 
 # --- Setter'lar: senkron gelen değişikliklerde efekt oynat ---
