@@ -93,6 +93,8 @@ func _build_quest_box() -> void:
 func _on_game_started() -> void:
 	visible = not Network.is_dedicated
 	inventory.visible = false
+	get_viewport().gui_release_focus()
+	_focus_web_canvas()
 	chat_log.clear()
 	chat_log.append_text("[color=#9aa]Sohbet için Enter'a bas. Çanta: I, görev: kamptaki Kâhin (F).[/color]\n")
 
@@ -156,6 +158,19 @@ func _update_hint(p) -> void:
 			text = "Kâhin: \"%s\"" % Quests.describe(p.quest_kind, p.quest_have, p.quest_need)
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+## Tarayıcıda klavye olayları yalnızca odaktaki tuvale gelir; sayfa ya da itch.io çerçevesi odağı
+## alırsa tuşlar oyuna ulaşmaz. Oyuna her tıklamada odağı tuvale geri ver.
+func _focus_web_canvas() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("(function(){var c=document.getElementById('canvas')||document.querySelector('canvas');" +
+			"if(c){if(!c.hasAttribute('tabindex')){c.setAttribute('tabindex','0');}window.focus();c.focus();}})()", true)
+
+
+func _input(event: InputEvent) -> void:
+	if visible and event is InputEventMouseButton and event.pressed and OS.has_feature("web"):
+		_focus_web_canvas()
 
 
 func _unhandled_input(event: InputEvent) -> void:

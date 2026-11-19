@@ -205,6 +205,9 @@ func _process_local(delta: float) -> void:
 		var to_mouse := get_global_mouse_position() - (global_position + Vector2(0, -20))
 		if to_mouse.length() > 4.0:
 			facing = to_mouse.normalized()
+		# Sağ fare tuşu basılıyken imlece doğru yürü (klavyesiz oynamak için de).
+		if dir == Vector2.ZERO and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and to_mouse.length() > 12.0:
+			dir = to_mouse.normalized()
 	if _dash_left > 0.0 and not dead:
 		_dash_left -= delta
 		velocity = _dash_dir * DASH_SPEED

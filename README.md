@@ -6,7 +6,7 @@ Godot 4.6 ile yapılmış, 2D yukarıdan bakışlı çok oyunculu aksiyon RPG.
 - **Tarayıcıda oyna:** https://johntitortheprog.itch.io/kadim-diyar-online-web
 
 ## Nasıl oynanır
-- **WASD / Ok tuşları**: hareket
+- **WASD / Ok tuşları** ya da **sağ fare tuşu basılı**: hareket (sağ tıkla imlece doğru yürünür)
 - **Fare**: nişan, **Sol tık / Boşluk**: kılıç saldırısı
 - **E / Shift / R**: yetenekler (Kasırga, Atılma, Şifa)
 - **Q**: iksir iç (azami canın %40'ı, 6 sn bekleme), **B**: kamptaki tüccardan iksir al (30 altın, en çok 5)
@@ -34,6 +34,8 @@ Her seviyede +20 maks. can ve +4 hasar kazanılır. 5 saniye hasar almazsan can�
   içindeki rastgele anahtardır (isim değiştirmek kaydı etkilemez). Sunucu kaydı `user://kayit.json`
   dosyasına, oyuncu ayrılınca ve 20 saniyede bir yazar.
 - **Ses:** tüm efektler kodla sentezlenir (`scripts/sfx.gd`).
+- **Tuşlar** hem fiziksel konumla hem harfle tanımlıdır (farklı klavye düzenlerinde ve tuş kodunu gizleyen
+  tarayıcılarda da çalışsın diye). Tarayıcıda oyuna her tıklamada klavye odağı oyun alanına alınır.
 
 ## Çok oyunculu
 - Bir oyuncu **Sunucu Kur (Host)** der, diğerleri onun IP adresini yazıp **Katıl (Join)** der.
