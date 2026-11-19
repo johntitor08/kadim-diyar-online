@@ -56,7 +56,8 @@ func _on_join() -> void:
 	if Network.is_web() and not address.begins_with("ws"):
 		status_label.text = "Sunucu adresi alınıyor..."
 		_set_busy(true)
-		WebAddress.fetch(self, _on_web_address)
+		WebAddress.fetch(self, _on_web_address, func(n: int) -> void:
+			status_label.text = "Sunucu adresi alınıyor... (%d. deneme)" % n)
 		return
 	_join(address)
 
