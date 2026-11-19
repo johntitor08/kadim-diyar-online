@@ -2,8 +2,9 @@
 
 Godot 4.6 ile yapılmış, 2D yukarıdan bakışlı çok oyunculu aksiyon RPG.
 
+- **Oyun sayfası ve fragman:** https://johntitor08.github.io/kadim-diyar-online/
+- **Tarayıcıda oyna:** https://johntitor08.github.io/kadim-diyar-online/oyna/ (ya da https://johntitortheprog.itch.io/kadim-diyar-online-web)
 - **İndir (Windows, Linux):** https://johntitortheprog.itch.io/kadim-diyar-online
-- **Tarayıcıda oyna:** https://johntitortheprog.itch.io/kadim-diyar-online-web
 
 ## Nasıl oynanır
 - **WASD / Ok tuşları** ya da **sağ fare tuşu basılı**: hareket (sağ tıkla imlece doğru yürünür)
